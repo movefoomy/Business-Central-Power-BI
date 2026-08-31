@@ -215,51 +215,74 @@ input[type="date"] { font-size: 13px; }
 .card-head .hint { margin: 3px 0 0; font-size: 12px; color: var(--ink-2); }
 
 .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 22px; }
-.chart-body { display: flex; align-items: center; gap: 18px; padding: 16px 20px 20px; }
-.donut-wrap { position: relative; flex: none; }
-.donut { display: block; }
-.donut path, .donut circle.seg { transition: opacity .12s ease; cursor: default; }
-/* One class carries the slot colour as --c; the SVG marks and the legend/tooltip
-   swatches all read it. Do NOT go back to fill="var(--sN)": var() is not resolved in
-   SVG presentation attributes, so the mark renders black. */
+.chart-body { padding: 15px 20px 18px; }
+
+/* One class carries the slot colour as --c; the bars and the legend/tooltip swatches all
+   read it. Keep these next to whatever consumes them: they were once defined beside the
+   donut rules and were silently dropped when those were removed, which left every bar
+   falling back to the same accent colour. */
 .c1 { --c: var(--s1); } .c2 { --c: var(--s2); } .c3 { --c: var(--s3); }
 .c4 { --c: var(--s4); } .c5 { --c: var(--s5); } .c6 { --c: var(--s6); }
 .c7 { --c: var(--s7); }
-.donut path { fill: var(--c); }
-.donut circle.seg { fill: none; stroke: var(--c); }
-.donut circle.ring { fill: none; stroke: var(--hairline); }
-.donut.dim path:not(.hot) { opacity: .26; }
-.donut-mid {
-  position: absolute; inset: 0; display: flex; flex-direction: column;
-  align-items: center; justify-content: center; pointer-events: none; text-align: center;
+
+/* Horizontal bars: length is the comparison, so both charts share one scale and one row
+   order, which lets a group's revenue bar be read directly against its cost bar. */
+.bars { display: flex; flex-direction: column; gap: 2px; }
+.bar-row {
+  display: grid; grid-template-columns: 88px 1fr auto 48px;
+  align-items: center; gap: 10px; padding: 3px 4px; border-radius: 5px;
 }
-.donut-mid .t { font-size: 10px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--ink-3); }
-.donut-mid .n {
-  font-family: Archivo, sans-serif; font-size: 21px; font-weight: 600;
-  letter-spacing: -.02em; font-variant-numeric: tabular-nums; margin-top: 2px;
+.bar-row:hover { background: var(--surface-2); }
+.bar-row .bl {
+  font-size: 11.5px; font-weight: 600; color: var(--ink-2);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.legend { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.lg {
-  display: grid; grid-template-columns: 10px 1fr auto auto; align-items: center;
-  gap: 9px; padding: 6px 7px; border-radius: 6px; cursor: default;
-  border-top: 1px solid var(--hairline-2); font-size: 12.5px;
+.btrack { height: 15px; background: var(--hairline-2); border-radius: 3px; }
+.bfill {
+  height: 100%; background: var(--c, var(--accent));
+  border-radius: 3px; min-width: 2px;
+  transition: width .18s ease;
 }
-.legend .lg:first-child { border-top: 0; }
-.lg:hover { background: var(--surface-2); }
-.lg .sw { width: 10px; height: 10px; border-radius: 2px; background: var(--c); }
-.lg .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
-.lg .vl { font-variant-numeric: tabular-nums; color: var(--ink-2); }
-.lg .pc { font-variant-numeric: tabular-nums; color: var(--ink-3); width: 46px; text-align: right; }
+.bar-row .bv {
+  font-size: 12px; font-variant-numeric: tabular-nums; color: var(--ink);
+  white-space: nowrap;
+}
+.bar-row .bp {
+  font-size: 11.5px; font-variant-numeric: tabular-nums;
+  color: var(--ink-3); text-align: right;
+}
+.bars-empty { padding: 22px 4px; color: var(--ink-3); font-size: 12.5px; text-align: center; }
 
 /* ---------- table ---------- */
-.table-scroll { overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+/* The grid is its own scroll viewport: capped height so the horizontal scrollbar sits at
+   the bottom of the visible table rather than below all 98 rows, and the page itself never
+   has to be scrolled to the end to reach it. Header sticks to the top, totals to the
+   bottom, customer to the left. */
+.table-scroll {
+  overflow: auto;
+  max-height: min(58vh, 640px);
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+.table-scroll::-webkit-scrollbar { width: 12px; height: 12px; }
+.table-scroll::-webkit-scrollbar-track { background: var(--surface-2); }
+.table-scroll::-webkit-scrollbar-thumb {
+  background: var(--ink-3); border-radius: 7px;
+  border: 3px solid var(--surface-2);
+}
+.table-scroll::-webkit-scrollbar-thumb:hover { background: var(--ink-2); }
+.table-scroll::-webkit-scrollbar-corner { background: var(--surface-2); }
+.table-scroll { scrollbar-color: var(--ink-3) var(--surface-2); }
+table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
 thead th {
-  position: sticky; top: 0; z-index: 2; background: var(--surface-2);
-  border-bottom: 1px solid var(--hairline);
+  position: sticky; z-index: 4; background: var(--surface-2);
   font-size: 10.5px; font-weight: 700; letter-spacing: .085em; text-transform: uppercase;
   color: var(--ink-3); text-align: right; padding: 0; white-space: nowrap;
+  /* border-collapse is separate now, so sticky cells keep their rules via inset shadow */
+  box-shadow: inset 0 -1px 0 var(--hairline);
 }
+thead tr.grps th { top: 0; }
+thead tr.subs th { top: var(--band-h, 30px); }
 thead th:first-child { text-align: left; }
 thead button {
   font: inherit; letter-spacing: inherit; text-transform: inherit; color: inherit;
@@ -269,31 +292,51 @@ thead button {
 thead button:hover { color: var(--accent); }
 thead th[aria-sort] button { color: var(--ink); }
 thead .arrow { color: var(--accent); font-size: 9px; margin-left: 3px; }
-tbody td, tfoot td { padding: 10px 16px; text-align: right; border-bottom: 1px solid var(--hairline-2); }
+tbody td, tfoot td {
+  padding: 10px 16px; text-align: right;
+  box-shadow: inset 0 -1px 0 var(--hairline-2);
+}
 tbody td:first-child, tfoot td:first-child { text-align: left; }
-tbody tr:hover td { background: var(--surface-2); }
+tbody tr:hover td { background: color-mix(in srgb, var(--accent) 8%, transparent); }
 td.name { font-weight: 500; max-width: 300px; }
 td.name .code { color: var(--ink-3); font-weight: 400; font-size: 11.5px; margin-left: 7px; }
 td.n { font-variant-numeric: tabular-nums; white-space: nowrap; }
 td.pos { color: var(--pos); }
 td.neg { color: var(--neg); }
-tfoot td { border-bottom: 0; border-top: 1px solid var(--hairline); font-weight: 700; background: var(--surface-2); }
+tfoot td {
+  position: sticky; bottom: 0; z-index: 3;
+  font-weight: 700; background: var(--surface-2);
+  box-shadow: inset 0 1px 0 var(--hairline);
+}
 .no-rows { padding: 40px 16px; text-align: center; color: var(--ink-3); }
 
-/* Monthly grid. Cell shading is a magnitude cue, so the eye finds the big months
-   without reading every figure; --h is the intensity, --tint the direction. */
-td.heat { background: color-mix(in srgb, var(--tint, var(--accent)) var(--h, 0%), transparent); }
+/* Monthly grid: every month is a block of five measures, so the months themselves are
+   separated by a rule and a faint alternating wash rather than per-cell shading, which
+   would be noise at this column count. */
+td.alt, th.alt { background: color-mix(in srgb, var(--ink) 3.5%, transparent); }
+td.gstart { box-shadow: inset 1px 0 0 var(--hairline), inset 0 -1px 0 var(--hairline-2); }
+th.gstart { box-shadow: inset 1px 0 0 var(--hairline), inset 0 -1px 0 var(--hairline); }
+tfoot td.gstart { box-shadow: inset 1px 0 0 var(--hairline), inset 0 1px 0 var(--hairline); }
 td.blank { color: var(--ink-3); }
+thead tr.subs th { font-size: 9.5px; letter-spacing: .04em; padding: 0; }
+thead tr.subs th button { padding: 7px 10px; }
+th.grp {
+  text-align: center; font-size: 11px; letter-spacing: .07em;
+  color: var(--ink-2); padding: 9px 10px 7px;
+}
+th.grp.totgrp { color: var(--ink); }
+td.num-mt { color: var(--ink-2); }
 /* The customer column stays put when the months scroll sideways. */
 th.namecol, td.name {
   position: sticky; left: 0; background: var(--surface);
-  border-right: 1px solid var(--hairline-2);
 }
-th.namecol { z-index: 4; background: var(--surface-2); }
-td.name { z-index: 1; }
-tbody tr:hover td.name { background: var(--surface-2); }
+/* The corner cell is pinned on both axes, so it has to outrank both. */
+th.namecol { z-index: 6; background: var(--surface-2); box-shadow: inset -1px -1px 0 var(--hairline); }
+td.name { z-index: 2; box-shadow: inset -1px 0 0 var(--hairline-2), inset 0 -1px 0 var(--hairline-2); }
+tfoot td.name { z-index: 5; box-shadow: inset -1px 0 0 var(--hairline), inset 0 1px 0 var(--hairline); }
+tbody tr:hover td.name { background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
 tfoot td.name { background: var(--surface-2); }
-th.totcol, td.tot { border-left: 1px solid var(--hairline); font-weight: 600; }
+td.tot { font-weight: 600; }
 
 /* ---------- tooltip ---------- */
 #tip {
@@ -307,10 +350,35 @@ th.totcol, td.tot { border-left: 1px solid var(--hairline); font-weight: 600; }
 #tip .sw { width: 9px; height: 9px; border-radius: 2px; flex: none; background: var(--c); }
 #tip .tr { color: var(--ink-2); font-variant-numeric: tabular-nums; }
 
-footer { margin-top: 26px; color: var(--ink-3); font-size: 11.5px; line-height: 1.7; }
-footer b { color: var(--ink-2); font-weight: 600; }
-footer .flag { color: var(--warn); }
+footer {
+  margin-top: 26px; padding: 20px 22px;
+  background: var(--surface); border: 1px solid var(--hairline);
+  border-radius: 10px; box-shadow: var(--shadow);
+  color: var(--ink-2); font-size: 12px; line-height: 1.65;
+}
+footer h2 {
+  margin: 0 0 14px; font-size: 13.5px; font-weight: 600;
+  letter-spacing: -.005em; color: var(--ink);
+}
+footer b { color: var(--ink); font-weight: 600; }
+footer .src { color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.defs { display: grid; grid-template-columns: max-content 1fr; gap: 10px 20px; margin: 0; }
+.defs dt { font-weight: 700; color: var(--ink); white-space: nowrap; }
+.defs dd { margin: 0; }
+.fgrid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 13px 24px; margin-top: 16px; padding-top: 15px;
+  border-top: 1px solid var(--hairline-2);
+}
+footer .flag {
+  color: var(--warn); margin-top: 15px; padding-top: 13px;
+  border-top: 1px solid var(--hairline-2);
+}
 footer .flag b { color: var(--warn); }
+@media (max-width: 640px) {
+  .defs { grid-template-columns: 1fr; gap: 2px 0; }
+  .defs dd { margin-bottom: 9px; }
+}
 
 :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
@@ -321,8 +389,6 @@ footer .flag b { color: var(--warn); }
 @media (max-width: 640px) {
   .wrap { padding: 0 14px 48px; }
   .kpis { grid-template-columns: 1fr; }
-  .chart-body { flex-direction: column; align-items: stretch; }
-  .donut-wrap { align-self: center; }
   .filters { position: static; }
   .stamp { margin-left: 0; text-align: left; align-items: flex-start; }
 }
@@ -400,45 +466,11 @@ footer .flag b { color: var(--warn); }
     </div>
   </section>
 
-  <section class="charts">
-    <div class="card">
-      <div class="card-head">
-        <p class="eyebrow">Product mix</p>
-        <h2>Revenue by product</h2>
-        <p class="hint">General product posting group</p>
-      </div>
-      <div class="chart-body">
-        <div class="donut-wrap">
-          <svg class="donut" id="d-rev" width="188" height="188" viewBox="0 0 188 188" role="img" aria-labelledby="d-rev-t"><title id="d-rev-t">Revenue split by general product posting group</title></svg>
-          <div class="donut-mid"><div class="t">Revenue</div><div class="n" id="d-rev-tot"></div></div>
-        </div>
-        <div class="legend" id="l-rev"></div>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-head">
-        <p class="eyebrow">Product mix</p>
-        <h2>COGS by product</h2>
-        <p class="hint">General product posting group</p>
-      </div>
-      <div class="chart-body">
-        <div class="donut-wrap">
-          <svg class="donut" id="d-cog" width="188" height="188" viewBox="0 0 188 188" role="img" aria-labelledby="d-cog-t"><title id="d-cog-t">Cost of sales split by general product posting group</title></svg>
-          <div class="donut-mid"><div class="t">COGS</div><div class="n" id="d-cog-tot"></div></div>
-        </div>
-        <div class="legend" id="l-cog"></div>
-      </div>
-    </div>
-  </section>
-
   <section class="card">
-    <div class="card-head split">
-      <div>
-        <p class="eyebrow">Detail</p>
-        <h2>Customer performance by month</h2>
-        <p class="hint" id="tbl-hint"></p>
-      </div>
-      <div class="measures" id="measures" role="group" aria-label="Measure shown in the grid"></div>
+    <div class="card-head">
+      <p class="eyebrow">Detail</p>
+      <h2>Customer performance by month</h2>
+      <p class="hint" id="tbl-hint"></p>
     </div>
     <div class="table-scroll">
       <table>
@@ -449,11 +481,57 @@ footer .flag b { color: var(--warn); }
     </div>
   </section>
 
+  <section class="charts">
+    <div class="card">
+      <div class="card-head">
+        <p class="eyebrow">Product mix</p>
+        <h2>Revenue by product</h2>
+        <p class="hint">General product posting group &middot; <span id="b-rev-tot"></span></p>
+      </div>
+      <div class="chart-body">
+        <div class="bars" id="b-rev" role="img" aria-label="Revenue by general product posting group"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <p class="eyebrow">Product mix</p>
+        <h2>COGS by product</h2>
+        <p class="hint">General product posting group &middot; <span id="b-cog-tot"></span></p>
+      </div>
+      <div class="chart-body">
+        <div class="bars" id="b-cog" role="img" aria-label="Cost of sales by general product posting group"></div>
+      </div>
+    </div>
+  </section>
+
   <footer>
-    <div><b>Volume basis.</b> Total MT is total quantity in kilograms divided by 1,000, taken only from value entries whose item ledger entry quantity is not zero. That condition is what counts each goods movement once: Business Central writes several value entries per shipment (original, cost adjustment, invoice reversal, invoice actual) and repeats the same kilogram figure on each, so summing every row overstates volume roughly twelvefold.</div>
+    <h2>How each figure is calculated</h2>
+    <dl class="defs">
+      <dt>Total MT</dt>
+      <dd>Tonnage shipped, in metric tonnes &mdash; kilograms divided by 1,000. Counted <b>once per delivery</b>: Business Central records a shipment several times over (the delivery, a cost adjustment, then the invoice) and repeats the weight on each, so only the entry carrying the item ledger quantity is used. <span class="src">WIN_Total_Qty_in_Kg &divide; 1,000, where Item_Ledger_Entry_Quantity &ne; 0</span></dd>
+
+      <dt>Revenue</dt>
+      <dd>Sales value of the goods shipped, <b>whether or not they have been invoiced yet</b>. A delivery posts an expected value; the invoice reverses it and posts the actual, so both are added together and the figure is right at any stage of the cycle. <span class="src">Sales_Amount_Actual_New + Sales_Amount_Expected_New</span></dd>
+
+      <dt>Cost of sales</dt>
+      <dd>What the goods themselves cost &mdash; the inventory value released when they left the warehouse. <b>Product cost only</b>: no overheads, freight or delivery charges. It follows the same actual-plus-expected pattern as revenue, so goods shipped but not yet invoiced still carry their cost, and it picks up later cost adjustments once Business Central has posted them. <span class="src">Cost_Amount_Actual + Cost_Amount_Expected</span></dd>
+
+      <dt>Gross profit</dt>
+      <dd>Revenue minus cost of sales. Negative means the goods sold for less than they cost.</dd>
+
+      <dt>GP %</dt>
+      <dd>Gross profit as a share of revenue. Worked out from each month's own revenue and cost, <b>never averaged across months</b>, so a small month cannot distort the total.</dd>
+    </dl>
+
+    <div class="fgrid">
+      <div><b>What is counted.</b> Sales deliveries, invoices, return receipts and credit memos; returns and credit memos subtract. Internal postings and delivery-charge lines are left out, as the latter earn revenue but carry no tonnage.</div>
+      <div><b>Reading the table.</b> Months run left to right, each showing all five figures, with the period total on the right. Every column sorts. A dash means no trade that month.</div>
+      <div><b>Rounding.</b> Amounts are Singapore dollars, and month cells are abbreviated to thousands (K) or millions (M) to keep the table readable &mdash; hover any cell for the exact figure. Totals are worked out at full precision, so a column may differ by a cent from adding up the rounded figures on screen.</div>
+      <div><b>Filters.</b> The posting date range and customer selection at the top drive everything on the page &mdash; the four headline figures, the table and both charts all move together.</div>
+      <div><b>The two charts share one scale</b> and one row order, so a product's revenue bar can be read straight across against its cost bar: wherever the lower bar is the longer one, that product sold below cost.</div>
+    </div>
+
     <div id="mt-notes" class="flag" hidden></div>
-    <div><b>Amount basis.</b> Revenue sums <span class="num">Sales_Amount_Actual_New + Sales_Amount_Expected_New</span> and cost of sales sums <span class="num">Cost_Amount_Actual + Cost_Amount_Expected</span> across all rows, so the expected amount posted on a shipment and its reversal on the invoice net to the true figure. Cost and volume are shown positive.</div>
-    <div><b>Scope.</b> Sales shipments, invoices, return receipts and credit memos. Excludes source no. ZZZZZ and item codes beginning YY (delivery charges).</div>
   </footer>
 </div>
 
@@ -497,20 +575,19 @@ GROUPS.forEach((g, i) => { classOf[g] = "c" + ((i % SLOTS.length) + 1); });
 /* ---------- state ---------- */
 const state = {
   from: DATA.minDate, to: DATA.maxDate, picked: new Set(),
-  measure: "rev",   // which measure fills the monthly grid
-  sort: "total",    // "name", "total", or "m:YYYY-MM"
+  sort: "total:rev",  // "name", "total:<measure>", or "m:YYYY-MM:<measure>"
   dir: -1,
 };
 
-/* The grid shows one measure at a time; months across, customers down. */
-const MEASURES = [
-  { k: "mt",   label: "Total MT",      cell: (v) => num2(v),    tot: (v) => num2(v),   div: false, unit: "MT" },
-  { k: "rev",  label: "Revenue",       cell: (v) => compact(v), tot: (v) => num2(v),   div: false, unit: "S$" },
-  { k: "cogs", label: "Cost of sales", cell: (v) => compact(v), tot: (v) => num2(v),   div: false, unit: "S$" },
-  { k: "gp",   label: "Gross profit",  cell: (v) => compact(v), tot: (v) => num2(v),   div: true,  unit: "S$" },
-  { k: "gpm",  label: "GP %",          cell: (v) => pct(v),     tot: (v) => pct(v),    div: true,  unit: "" },
+/* Every month shows all five measures side by side. Month cells use compact notation so a
+   wide grid stays scannable; the Total group and the hover card carry full precision. */
+const SUBS = [
+  { k: "mt",   short: "MT",   label: "Total MT",      cell: (v) => num2(v),    tot: (v) => num2(v), sign: false },
+  { k: "rev",  short: "Rev",  label: "Revenue",       cell: (v) => compact(v), tot: (v) => num2(v), sign: false },
+  { k: "cogs", short: "COGS", label: "Cost of sales", cell: (v) => compact(v), tot: (v) => num2(v), sign: false },
+  { k: "gp",   short: "GP",   label: "Gross profit",  cell: (v) => compact(v), tot: (v) => num2(v), sign: true },
+  { k: "gpm",  short: "GP %", label: "GP %",          cell: (v) => pct(v),     tot: (v) => pct(v),  sign: true },
 ];
-const measure = () => MEASURES.find((x) => x.k === state.measure) || MEASURES[1];
 
 function monthLabel(ym) {
   const [y, mo] = ym.split("-").map(Number);
@@ -586,88 +663,47 @@ function renderKpis(m) {
   $("k-gp-note").textContent = m.rev ? pct(m.gp / m.rev) + " margin" : "—";
 }
 
-/* ---------- donuts ---------- */
-const R = 68, TH = 26, CX = 94, CY = 94, GAP = 0.028; // radians of surface gap between slices
+/* ---------- product-mix bars ---------- */
+/* Both charts are drawn to ONE shared scale and ONE shared row order, so a group's
+   revenue bar can be read straight across against its cost bar. Order is by revenue
+   descending; colour still follows the product group, never its position. */
+function renderBars(hostId, totId, map, other, label) {
+  const host = $(hostId);
+  const entries = GROUPS.map((g) => ({ g, v: map.get(g) || 0 }));
+  const total = entries.reduce((s, e) => s + e.v, 0);
+  const scale = Math.max(
+    ...GROUPS.map((g) => Math.max(map.get(g) || 0, other.get(g) || 0)), 1);
 
-function arc(a0, a1) {
-  const ro = R + TH / 2, ri = R - TH / 2;
-  const big = a1 - a0 > Math.PI ? 1 : 0;
-  const p = (r, a) => [CX + r * Math.cos(a), CY + r * Math.sin(a)];
-  const [x1, y1] = p(ro, a0), [x2, y2] = p(ro, a1), [x3, y3] = p(ri, a1), [x4, y4] = p(ri, a0);
-  return "M" + x1 + " " + y1 + "A" + ro + " " + ro + " 0 " + big + " 1 " + x2 + " " + y2 +
-         "L" + x3 + " " + y3 + "A" + ri + " " + ri + " 0 " + big + " 0 " + x4 + " " + y4 + "Z";
-}
+  $(totId).textContent = total ? "S$ " + compact(total) + " total" : "no postings";
+  host.textContent = "";
 
-function renderDonut(svgId, legId, totId, map, label) {
-  const svg = $(svgId), leg = $(legId);
-  // Slice order follows the fixed group order, so neighbouring slices are always
-  // adjacent palette slots — the pairing the palette was validated on.
-  const items = GROUPS.filter((g) => (map.get(g) || 0) > 0).map((g) => ({ g, v: map.get(g) }));
-  const total = items.reduce((s, i) => s + i.v, 0);
-  $(totId).textContent = total ? compact(total) : "—";
-  // Clear the marks but keep the title element, which aria-labelledby points at.
-  Array.prototype.slice.call(svg.children).forEach((n) => {
-    if (n.tagName.toLowerCase() !== "title") n.remove();
-  });
-  leg.textContent = "";
-
-  const ring = (cls) => {
-    const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-    c.setAttribute("cx", CX); c.setAttribute("cy", CY); c.setAttribute("r", R);
-    c.setAttribute("stroke-width", TH);
-    c.setAttribute("class", cls);
-    svg.appendChild(c);
-    return c;
-  };
-
-  if (!total) {
-    ring("ring");
-    leg.innerHTML = '<p class="empty-opt">No postings in this selection.</p>';
+  const shown = entries.filter((e) => e.v > 0);
+  if (!shown.length) {
+    host.innerHTML = '<p class="bars-empty">No postings in this selection.</p>';
     return;
   }
 
-  let a = -Math.PI / 2;
-  items.forEach((it) => {
-    const span = (it.v / total) * Math.PI * 2;
-    if (items.length === 1) {
-      // A single 100% slice: an arc from a to a+2pi has identical end points and
-      // paints nothing, so draw the full ring as a stroked circle instead.
-      it.path = ring("seg " + classOf[it.g]);
-    } else {
-      const g0 = GAP / 2;
-      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-      path.setAttribute("d", arc(a + g0, a + Math.max(span - g0, g0 + 0.001)));
-      path.setAttribute("class", classOf[it.g]);
-      svg.appendChild(path);
-      it.path = path;
-    }
-    it.path.dataset.g = it.g;
-    a += span;
-  });
-
-  items.forEach((it) => {
+  for (const e of shown) {
     const row = document.createElement("div");
-    row.className = "lg";
+    row.className = "bar-row";
     row.innerHTML =
-      '<span class="sw ' + classOf[it.g] + '"></span>' +
-      '<span class="nm"></span><span class="vl"></span>' +
-      '<span class="pc">' + pct(it.v / total) + "</span>";
-    row.querySelector(".nm").textContent = it.g;
-    row.querySelector(".vl").textContent = num2(it.v);
-    leg.appendChild(row);
+      '<span class="bl"></span>' +
+      '<div class="btrack"><div class="bfill ' + classOf[e.g] + '"></div></div>' +
+      '<span class="bv"></span>' +
+      '<span class="bp">' + pct(total ? e.v / total : 0) + "</span>";
+    row.querySelector(".bl").textContent = e.g;
+    row.querySelector(".bv").textContent = num2(e.v);
+    row.querySelector(".bfill").style.width = (e.v / scale * 100).toFixed(2) + "%";
+    host.appendChild(row);
 
-    const on = (ev) => {
-      svg.classList.add("dim"); it.path.classList.add("hot");
-      showTip(ev, it.g, classOf[it.g],
-        [label + " S$ " + num2(it.v), pct(it.v / total) + " of " + label.toLowerCase()]);
-    };
-    const off = () => { svg.classList.remove("dim"); it.path.classList.remove("hot"); hideTip(); };
-    [row, it.path].forEach((el) => {
-      el.addEventListener("mouseenter", on);
-      el.addEventListener("mousemove", (ev) => moveTip(ev));
-      el.addEventListener("mouseleave", off);
-    });
-  });
+    const lines = [
+      label + "  S$ " + num2(e.v),
+      pct(total ? e.v / total : 0) + " of " + label.toLowerCase(),
+    ];
+    row.addEventListener("mouseenter", (ev) => showTip(ev, e.g, classOf[e.g], lines));
+    row.addEventListener("mousemove", (ev) => moveTip(ev));
+    row.addEventListener("mouseleave", hideTip);
+  }
 }
 
 /* ---------- tooltip ---------- */
@@ -693,69 +729,119 @@ function hideTip() { tip.style.opacity = "0"; }
 
 /* ---------- table ---------- */
 function renderTable(m) {
-  const meas = measure();
   const months = m.months;
-  const val = (row, key) => key === "total"
-    ? row[meas.k]
-    : (row.byMonth.get(key.slice(2)) || {})[meas.k];
+  const val = (row, key) => {
+    if (key === "name") return row.name;
+    const [scope, a, b] = key.split(":");
+    return scope === "total" ? row[a] : (row.byMonth.get(a) || {})[b];
+  };
 
   const rows = m.rows.slice();
   const k = state.sort, d = state.dir;
-  rows.sort((a, b) => {
-    if (k === "name") return d * a.name.localeCompare(b.name);
-    const av = val(a, k), bv = val(b, k);
+  rows.sort((x, y) => {
+    if (k === "name") return d * x.name.localeCompare(y.name);
+    const xv = val(x, k), yv = val(y, k);
     // Months a customer did not trade in sort below the ones they did.
-    if (av === undefined && bv === undefined) return a.name.localeCompare(b.name);
-    if (av === undefined) return 1;
-    if (bv === undefined) return -1;
-    return d * (av - bv) || a.name.localeCompare(b.name);
+    if (xv === undefined && yv === undefined) return x.name.localeCompare(y.name);
+    if (xv === undefined) return 1;
+    if (yv === undefined) return -1;
+    return d * (xv - yv) || x.name.localeCompare(y.name);
   });
 
-  // Shade cells by magnitude relative to the largest month cell on screen.
-  let peak = 0;
-  for (const row of rows) {
-    for (const ym of months) {
-      const v = row.byMonth.get(ym);
-      if (v) peak = Math.max(peak, Math.abs(v[meas.k]));
-    }
+  // ---- header: a month band over a row of measure columns ----
+  const bands = document.createElement("tr");
+  bands.className = "grps";
+  const nameTh = document.createElement("th");
+  nameTh.className = "namecol";
+  nameTh.rowSpan = 2;
+  nameTh.scope = "col";
+  const nameBtn = document.createElement("button");
+  nameBtn.type = "button";
+  nameBtn.textContent = "Customer";
+  if (k === "name") {
+    nameTh.setAttribute("aria-sort", d === 1 ? "ascending" : "descending");
+    const ar = document.createElement("span");
+    ar.className = "arrow";
+    ar.textContent = d === 1 ? "▲" : "▼";
+    nameBtn.appendChild(ar);
   }
+  nameBtn.addEventListener("click", () => {
+    if (k === "name") state.dir *= -1; else { state.sort = "name"; state.dir = 1; }
+    render();
+  });
+  nameTh.appendChild(nameBtn);
+  bands.appendChild(nameTh);
 
-  const head = document.createElement("tr");
-  const th = (key, label, cls) => {
-    const el = document.createElement("th");
-    el.scope = "col";
-    if (cls) el.className = cls;
-    el.dataset.k = key;
-    const b = document.createElement("button");
-    b.type = "button";
-    b.textContent = label;
-    if (state.sort === key) {
-      el.setAttribute("aria-sort", d === 1 ? "ascending" : "descending");
-      const arrow = document.createElement("span");
-      arrow.className = "arrow";
-      arrow.textContent = d === 1 ? "▲" : "▼";
-      b.appendChild(arrow);
-    }
-    b.addEventListener("click", () => {
-      if (state.sort === key) state.dir *= -1;
-      else { state.sort = key; state.dir = key === "name" ? 1 : -1; }
-      render();
-    });
-    el.appendChild(b);
-    head.appendChild(el);
+  const subs = document.createElement("tr");
+  subs.className = "subs";
+  const addBand = (label, cls) => {
+    const th = document.createElement("th");
+    th.className = "grp " + cls;
+    th.colSpan = SUBS.length;
+    th.scope = "colgroup";
+    th.textContent = label;
+    bands.appendChild(th);
   };
-  th("name", "Customer", "namecol");
-  for (const ym of months) th("m:" + ym, monthLabel(ym));
-  th("total", "Total", "totcol");
-  $("thead").textContent = "";
-  $("thead").appendChild(head);
+  const addSubs = (keyFor, cls) => {
+    SUBS.forEach((sb, i) => {
+      const th = document.createElement("th");
+      th.scope = "col";
+      th.className = cls + (i === 0 ? " gstart" : "");
+      const key = keyFor(sb);
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = sb.short;
+      if (k === key) {
+        th.setAttribute("aria-sort", d === 1 ? "ascending" : "descending");
+        const ar = document.createElement("span");
+        ar.className = "arrow";
+        ar.textContent = d === 1 ? "▲" : "▼";
+        b.appendChild(ar);
+      }
+      b.addEventListener("click", () => {
+        if (state.sort === key) state.dir *= -1;
+        else { state.sort = key; state.dir = -1; }
+        render();
+      });
+      th.appendChild(b);
+      subs.appendChild(th);
+    });
+  };
+  months.forEach((ym, gi) => {
+    const cls = gi % 2 ? "alt" : "";
+    addBand(monthLabel(ym), cls + (gi === 0 ? " gstart" : " gstart"));
+    addSubs((sb) => "m:" + ym + ":" + sb.k, cls);
+  });
+  addBand("Total", "totgrp gstart");
+  addSubs((sb) => "total:" + sb.k, "tot");
 
+  const th = $("thead");
+  th.textContent = "";
+  th.appendChild(bands);
+  th.appendChild(subs);
+  syncBandHeight();
+
+  // ---- body ----
+  const cols = months.length * SUBS.length + SUBS.length + 1;
   const tb = $("tbody");
   tb.textContent = "";
   if (!rows.length) {
-    tb.innerHTML = '<tr><td class="no-rows" colspan="' + (months.length + 2) +
-      '">No customers match these filters.</td></tr>';
+    tb.innerHTML = '<tr><td class="no-rows" colspan="' + cols + '">No customers match these filters.</td></tr>';
   }
+
+  const cell = (v, sb, i, cls, fmt) => {
+    const td = document.createElement("td");
+    td.className = "n " + cls + (i === 0 ? " gstart" : "") + (sb.k === "mt" ? " num-mt" : "");
+    if (v === undefined) {
+      td.classList.add("blank");
+      td.textContent = "—";
+    } else {
+      const x = v[sb.k];
+      td.textContent = fmt(x);
+      if (sb.sign) td.classList.add(x < 0 ? "neg" : "pos");
+    }
+    return td;
+  };
 
   for (const row of rows) {
     const tr = document.createElement("tr");
@@ -766,59 +852,60 @@ function renderTable(m) {
     nameCell.querySelector(".code").textContent = row.no;
     tr.appendChild(nameCell);
 
-    for (const ym of months) {
+    months.forEach((ym, gi) => {
       const v = row.byMonth.get(ym);
-      const td = document.createElement("td");
-      td.className = "n";
-      if (!v) {
-        td.classList.add("blank");
-        td.textContent = "—";
-      } else {
-        const x = v[meas.k];
-        td.textContent = meas.cell(x);
-        if (meas.div) td.classList.add(x < 0 ? "neg" : "pos");
-        if (peak) {
-          td.classList.add("heat");
-          td.style.setProperty("--h", (4 + 44 * Math.min(Math.abs(x) / peak, 1)).toFixed(1) + "%");
-          td.style.setProperty("--tint", meas.div ? (x < 0 ? "var(--neg)" : "var(--pos)") : "var(--accent)");
-        }
-        attachCellTip(td, row.name, ym, v);
-      }
+      SUBS.forEach((sb, i) => {
+        const td = cell(v, sb, i, gi % 2 ? "alt" : "", sb.cell);
+        if (v) attachCellTip(td, row.name, ym, v);
+        tr.appendChild(td);
+      });
+    });
+    SUBS.forEach((sb, i) => {
+      const td = cell(row, sb, i, "tot", sb.tot);
+      attachCellTip(td, row.name, null, row);
       tr.appendChild(td);
-    }
-
-    const tot = document.createElement("td");
-    tot.className = "n tot" + (meas.div ? (row[meas.k] < 0 ? " neg" : " pos") : "");
-    tot.textContent = meas.tot(row[meas.k]);
-    attachCellTip(tot, row.name, null, row);
-    tr.appendChild(tot);
+    });
     tb.appendChild(tr);
   }
 
+  // ---- footer ----
   const foot = document.createElement("tr");
   const fname = document.createElement("td");
   fname.className = "name";
   fname.textContent = "Total — " + rows.length + (rows.length === 1 ? " customer" : " customers");
   foot.appendChild(fname);
-  for (const ym of months) {
+  months.forEach((ym, gi) => {
     const v = m.totalsByMonth.get(ym);
-    const td = document.createElement("td");
-    td.className = "n" + (meas.div ? (v[meas.k] < 0 ? " neg" : " pos") : "");
-    td.textContent = meas.tot(v[meas.k]);
-    attachCellTip(td, "All customers", ym, v);
+    SUBS.forEach((sb, i) => {
+      const td = cell(v, sb, i, gi % 2 ? "alt" : "", sb.tot);
+      attachCellTip(td, "All customers", ym, v);
+      foot.appendChild(td);
+    });
+  });
+  const grand = { mt: m.mt, rev: m.rev, cogs: m.cogs, gp: m.gp, gpm: m.rev ? m.gp / m.rev : 0 };
+  SUBS.forEach((sb, i) => {
+    const td = cell(grand, sb, i, "tot", sb.tot);
+    attachCellTip(td, "All customers", null, grand);
     foot.appendChild(td);
-  }
-  const ftot = document.createElement("td");
-  const grand = meas.k === "gpm" ? (m.rev ? m.gp / m.rev : 0) : m[meas.k];
-  ftot.className = "n tot" + (meas.div ? (grand < 0 ? " neg" : " pos") : "");
-  ftot.textContent = meas.tot(grand);
-  attachCellTip(ftot, "All customers", null, Object.assign({}, m, { gpm: m.rev ? m.gp / m.rev : 0 }));
-  foot.appendChild(ftot);
+  });
   $("tfoot").textContent = "";
   $("tfoot").appendChild(foot);
 }
 
-/* Every cell shows one measure, so the hover carries the other four at full precision. */
+/* The measure row sticks directly under the month band, so its offset has to be the
+   band's real rendered height -- which depends on the font, so measure it rather than
+   assume it. Re-measured on resize and once webfonts land. */
+function syncBandHeight() {
+  const band = document.querySelector("#thead tr.grps");
+  if (!band) return;
+  const h = Math.round(band.getBoundingClientRect().height);
+  if (h > 0) document.getElementById("thead").style.setProperty("--band-h", h + "px");
+}
+addEventListener("resize", syncBandHeight);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(syncBandHeight);
+
+/* Month cells are abbreviated to keep the grid scannable, so the hover carries every
+   measure for that customer and month at full precision. */
 function attachCellTip(td, name, ym, v) {
   const lines = [
     "Total MT  " + num2(v.mt),
@@ -914,22 +1001,20 @@ function render() {
   if (state.from > state.to) { const t = state.from; state.from = state.to; state.to = t; }
   $("from").value = state.from; $("to").value = state.to;
   const m = compute();
+  // One shared row order for both charts, so their rows line up for comparison.
+  GROUPS.sort((a, b) => (m.byGrpRev.get(b) || 0) - (m.byGrpRev.get(a) || 0));
   renderKpis(m);
-  renderDonut("d-rev", "l-rev", "d-rev-tot", m.byGrpRev, "Revenue");
-  renderDonut("d-cog", "l-cog", "d-cog-tot", m.byGrpCog, "COGS");
+  renderBars("b-rev", "b-rev-tot", m.byGrpRev, m.byGrpCog, "Revenue");
+  renderBars("b-cog", "b-cog-tot", m.byGrpCog, m.byGrpRev, "COGS");
   renderTable(m);
   renderPickLabel();
   syncPresets();
   if (!$("panel").hidden) renderOpts(m);
-  document.querySelectorAll("#measures .chip").forEach((b) => {
-    b.setAttribute("aria-pressed", String(b.dataset.m === state.measure));
-  });
-  const meas = measure();
   $("tbl-hint").textContent =
-    meas.label + (meas.unit ? " (" + meas.unit + ")" : "") + " by month · " +
+    "MT, revenue, cost of sales, gross profit and GP % for every month · " +
     niceDate(state.from) + " – " + niceDate(state.to) +
     (state.picked.size ? " · " + state.picked.size + " customer filter" + (state.picked.size > 1 ? "s" : "") : "") +
-    " · hover any cell for all measures";
+    " · amounts in S$, hover a cell for full precision";
 }
 
 /* ---------- wiring ---------- */
@@ -990,23 +1075,6 @@ for (const el of [$("from"), $("to")]) { el.min = DATA.minDate; el.max = DATA.ma
 $("from").addEventListener("change", (e) => { state.from = e.target.value || DATA.minDate; render(); });
 $("to").addEventListener("change", (e) => { state.to = e.target.value || DATA.maxDate; render(); });
 
-function buildMeasures() {
-  const host = $("measures");
-  for (const mm of MEASURES) {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.className = "chip";
-    b.textContent = mm.label;
-    b.dataset.m = mm.k;
-    b.addEventListener("click", () => {
-      state.measure = mm.k;
-      // A month sort stays meaningful across measures; a stale total sort does too.
-      render();
-    });
-    host.appendChild(b);
-  }
-}
-
 const panel = $("panel");
 $("pick").addEventListener("click", () => {
   const open = panel.hidden;
@@ -1028,12 +1096,11 @@ document.addEventListener("keydown", (e) => {
 });
 $("reset").addEventListener("click", () => {
   state.from = DATA.minDate; state.to = DATA.maxDate; state.picked.clear();
-  state.measure = "rev"; state.sort = "total"; state.dir = -1;
+  state.sort = "total:rev"; state.dir = -1;
   $("search").value = "";
   render();
 });
 
 buildPresets();
-buildMeasures();
 render();
 </script>
