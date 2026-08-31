@@ -33,15 +33,45 @@ EXCLUDED_SOURCE_NO = "ZZZZZ"
 # Item codes with this prefix are delivery charges: revenue but zero tonnage.
 EXCLUDED_ITEM_PREFIX = "YY"
 
-# Control totals verified against the live service. A mismatch means the dedupe rule
-# or a sign convention has changed upstream, so report it loudly rather than publish
-# numbers nobody has checked. Set CHECK_TOTALS=0 in the environment to skip.
-CONTROL_TOTALS = {
-    "mt": 93548.61,
-    "revenue": 26128244.00,
-    "cogs": 25115282.42,
-}
-CONTROL_TOLERANCE = 0.01
+# WIN_Conversion_to_Kg is kilograms per base unit. Where BC has set it, it is used as is.
+# Where it is zero the base unit of measure still carries the answer, because the codes are
+# self-describing: KG=1, MT=1000, and the packaging codes embed their fill weight
+# (DRUM-200=200, IBC-1250=1250, CARB-25=25, BAG-1000=1000). Every conversion observed in the
+# sales data matches its base UOM this way. The genuinely weightless units are listed below
+# and stay excluded from tonnage -- a drum sold as a drum is not product weight.
+NON_WEIGHT_UOM = {"PCS", "EACH", "EA", "UNIT", "JOB", "HOUR", "DAY"}
+FIXED_UOM_KG = {"KG": 1.0, "MT": 1000.0, "DMT": 1000.0, "TON": 1000.0, "G": 0.001}
+
+
+def kg_per_unit(uom):
+    """Kilograms per base unit, or None when the unit carries no weight."""
+    u = (uom or "").strip().upper()
+    if not u or u in NON_WEIGHT_UOM:
+        return None
+    if u in FIXED_UOM_KG:
+        return FIXED_UOM_KG[u]
+    if "-" in u:  # packaging codes embed the fill weight, e.g. CARB-27.5
+        try:
+            n = float(u.rsplit("-", 1)[1])
+        except ValueError:
+            return None
+        return n if n > 0 else None
+    return None
+
+# Sanity bands. Unlike a frozen set of expected totals, these do not drift as BC posts
+# new data, but they trip immediately if the volume dedupe or a sign convention breaks:
+# dropping the Item_Ledger_Entry_Quantity filter inflates MT about 12x, which drags
+# revenue per MT from roughly 280 down to 23. Failing these REFUSES to write, so an
+# unattended run can never overwrite a good dashboard with implausible numbers.
+MIN_REVENUE_PER_MT = 50.0
+MAX_REVENUE_PER_MT = 2000.0
+
+# An hourly refresh should not move the headline figures much. A jump beyond this is a
+# code change or a bulk repost rather than ordinary trading, so it is worth a line in
+# the log -- but it is only a warning, since a genuine large backposting is possible.
+DRIFT_WARN = 0.25
+
+# Set CHECK_TOTALS=0 in the environment to skip both checks.
 
 
 def load_config():
@@ -100,6 +130,22 @@ def num(row, key):
     return value if isinstance(value, (int, float)) else 0.0
 
 
+def previous_totals(path):
+    """Headline totals from the last successful run, for the drift check."""
+    try:
+        with open(path, encoding="utf-8") as fh:
+            rows = json.load(fh).get("rows") or []
+    except (OSError, ValueError, AttributeError):
+        return None
+    if not rows:
+        return None
+    return {
+        "mt": sum(r[3] for r in rows) / 1000.0,
+        "revenue": sum(r[4] for r in rows),
+        "cogs": sum(r[5] for r in rows),
+    }
+
+
 def build():
     cfg = load_config()
     header, ctx = make_opener(cfg)
@@ -111,7 +157,7 @@ def build():
         doc_filter, EXCLUDED_SOURCE_NO, cfg["min_posting_date"]
     )
     ve_select = (
-        "Source_No,Item_No,Gen_Prod_Posting_Group,Posting_Date,"
+        "Source_No,Item_No,Document_No,Gen_Prod_Posting_Group,Posting_Date,"
         "Item_Ledger_Entry_Quantity,WIN_Total_Qty_in_Kg,"
         "Sales_Amount_Actual_New,Sales_Amount_Expected_New,"
         "Cost_Amount_Actual,Cost_Amount_Expected"
@@ -124,6 +170,11 @@ def build():
         entity_url(cfg, "PBI_Customer", "Customer_Name,Customer_No"),
         header, ctx, "customers",
     )
+    item_rows = fetch(
+        entity_url(cfg, "PBI_Item", "No,Description,Base_Unit_of_Measure"),
+        header, ctx, "items",
+    )
+    items = {i["No"]: i for i in item_rows if i.get("No")}
 
     # PBI_Customer returns one row per ledger entry, so collapse to a No -> Name map.
     names = {}
@@ -151,6 +202,11 @@ def build():
     # Revenue and cost, by contrast, must use ALL rows: the expected amounts post on
     # the shipment and are reversed by the invoice, which carries the actual amounts,
     # so the pair nets to the true figure only when both are summed.
+    derive = cfg.get("derive_missing_conversion", True)
+    note = lambda: {"units": 0.0, "kg": 0.0, "custs": set(), "docs": set(), "uom": "", "desc": ""}
+    derived = collections.defaultdict(note)    # conversion recovered from the base UOM
+    weightless = collections.defaultdict(note)  # genuinely not weight-bearing
+
     agg = collections.defaultdict(lambda: [0.0, 0.0, 0.0])
     for row in entries:
         key = (
@@ -159,8 +215,26 @@ def build():
             row.get("Posting_Date") or "",
         )
         bucket = agg[key]
-        if num(row, "Item_Ledger_Entry_Quantity") != 0:
-            bucket[0] += num(row, "WIN_Total_Qty_in_Kg")
+        qty = num(row, "Item_Ledger_Entry_Quantity")
+        if qty != 0:
+            kg = num(row, "WIN_Total_Qty_in_Kg")
+            if kg == 0:
+                # BC left the conversion unset on this item. Fall back to the base unit of
+                # measure, and record it either way so the gap is never silent.
+                item_no = row.get("Item_No") or ""
+                meta = items.get(item_no, {})
+                per = kg_per_unit(meta.get("Base_Unit_of_Measure")) if derive else None
+                target = derived if per else weightless
+                rec = target[item_no]
+                rec["uom"] = meta.get("Base_Unit_of_Measure") or "?"
+                rec["desc"] = meta.get("Description") or row.get("Description") or ""
+                rec["units"] += -qty
+                rec["custs"].add(row.get("Source_No") or "")
+                rec["docs"].add(row.get("Document_No") or "")
+                if per:
+                    kg = qty * per
+                    rec["kg"] += -kg
+            bucket[0] += kg
         bucket[1] += num(row, "Sales_Amount_Actual_New") + num(row, "Sales_Amount_Expected_New")
         bucket[2] += num(row, "Cost_Amount_Actual") + num(row, "Cost_Amount_Expected")
 
@@ -180,13 +254,44 @@ def build():
         print("  WARNING: {0} customer no(s) not in PBI_Customer: {1}".format(
             len(missing), ", ".join(missing[:10])))
 
+    def summarise(store):
+        out = []
+        for item_no, rec in sorted(store.items()):
+            out.append({
+                "item": item_no,
+                "desc": rec["desc"],
+                "uom": rec["uom"],
+                "units": round(rec["units"], 2),
+                "kg": round(rec["kg"], 2),
+                "docs": len(rec["docs"]),
+                "customers": sorted(names.get(c, c) for c in rec["custs"] if c),
+            })
+        return out
+
+    mt_notes = {"derived": summarise(derived), "weightless": summarise(weightless)}
+    if mt_notes["derived"]:
+        print("")
+        print("  Conversion to kg was not set in BC; taken from the base unit of measure:")
+        for e in mt_notes["derived"]:
+            print("    {0} ({1}) base {2}: {3:,.2f} units -> {4:,.2f} kg over {5} document(s) - {6}".format(
+                e["item"], e["desc"][:38], e["uom"], e["units"], e["kg"], e["docs"],
+                ", ".join(e["customers"])[:60]))
+        print("    Fix at source: set the kg conversion on these items in Business Central.")
+    if mt_notes["weightless"]:
+        for e in mt_notes["weightless"]:
+            print("  Not weight-bearing, excluded from tonnage: {0} ({1}) base {2}, {3:,.2f} units".format(
+                e["item"], e["desc"][:38], e["uom"], e["units"]))
+
     dates = [r[2] for r in rows if r[2]]
     data = {
         "generated": datetime.datetime.now().strftime("%d %b %Y, %H:%M"),
+        # Offset-aware, so the page can age it correctly from any timezone.
+        "generatedISO": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
         "company": cfg["company"],
         "minDate": min(dates) if dates else "",
         "maxDate": max(dates) if dates else "",
         "groups": sorted({r[1] for r in rows}),
+        "mtNotes": mt_notes,
         "customers": {no: names.get(no, no) for no in used},
         "rows": rows,
     }
@@ -203,23 +308,39 @@ def build():
         total_rev - total_cogs,
         (total_rev - total_cogs) / total_rev * 100 if total_rev else 0))
 
-    if os.environ.get("CHECK_TOTALS", "1") != "0":
-        actual = {"mt": total_mt, "revenue": total_rev, "cogs": total_cogs}
-        bad = [
-            "{0}: expected {1:,.2f} got {2:,.2f}".format(k, v, actual[k])
-            for k, v in CONTROL_TOTALS.items()
-            if abs(actual[k] - v) > CONTROL_TOLERANCE
-        ]
-        if bad:
-            print("")
-            print("Control totals moved (expected once BC has new postings):")
-            for line in bad:
-                print("  " + line)
-            print("Review the figures above, then update CONTROL_TOTALS in refresh.py.")
-        else:
-            print("  Control totals OK")
+    data_path = os.path.join(HERE, "data.json")
+    totals = {"mt": total_mt, "revenue": total_rev, "cogs": total_cogs}
+    rev_per_mt = total_rev / total_mt if total_mt else 0.0
 
-    with open(os.path.join(HERE, "data.json"), "w", encoding="utf-8") as fh:
+    if os.environ.get("CHECK_TOTALS", "1") != "0":
+        # Read the previous run's figures before this run overwrites them.
+        prev = previous_totals(data_path)
+
+        problems = ["{0} is {1:,.2f}, expected above zero".format(k, v)
+                    for k, v in sorted(totals.items()) if v <= 0]
+        if not problems and not MIN_REVENUE_PER_MT <= rev_per_mt <= MAX_REVENUE_PER_MT:
+            problems.append(
+                "revenue per MT is {0:,.2f}, outside the plausible {1:,.0f}-{2:,.0f} band"
+                " -- check the volume dedupe and the sign handling".format(
+                    rev_per_mt, MIN_REVENUE_PER_MT, MAX_REVENUE_PER_MT))
+        if problems:
+            sys.exit("REFUSING TO WRITE, existing dashboard left untouched:\n  " +
+                     "\n  ".join(problems))
+
+        moved = []
+        if prev:
+            for key in sorted(totals):
+                was = prev.get(key) or 0.0
+                if was and abs(totals[key] - was) / abs(was) > DRIFT_WARN:
+                    moved.append("{0}: {1:,.2f} -> {2:,.2f}".format(key, was, totals[key]))
+        if moved:
+            print("  WARNING: moved more than {0:.0%} since the last refresh:".format(DRIFT_WARN))
+            for line in moved:
+                print("    " + line)
+        else:
+            print("  Checks OK  (S$ {0:,.2f} revenue per MT)".format(rev_per_mt))
+
+    with open(data_path, "w", encoding="utf-8") as fh:
         json.dump(data, fh, separators=(",", ":"))
 
     template_path = os.path.join(HERE, "dashboard.template.html")

@@ -7,14 +7,26 @@ Published artifact: <https://claude.ai/code/artifact/e9a57277-d2fd-41aa-8ecb-7e0
 
 ## Refreshing
 
-```
-python refresh.py
+A Windows scheduled task, **BC Sales Margin Refresh**, runs every hour and keeps `dashboard.html` on
+disk current. It runs as you, only while you are logged on, with no stored password, and appends each
+run to `refresh.log`. Nothing needs to be open for it to work.
+
+To run it by hand, or to check on it:
+
+```powershell
+python refresh.py                                    # refresh now, output to the console
+Start-ScheduledTask  -TaskName 'BC Sales Margin Refresh'   # trigger the hourly job now
+Get-ScheduledTaskInfo -TaskName 'BC Sales Margin Refresh'  # LastRunTime / LastTaskResult (0 = success)
+Get-Content refresh.log -Tail 20                     # what the last run did
+Unregister-ScheduledTask -TaskName 'BC Sales Margin Refresh'   # stop the hourly refresh
 ```
 
-Pulls from OData, rebuilds `data.json` and `dashboard.html`, and prints the totals. Standard library
-only — no pip install. Then republish `dashboard.html` to the same artifact URL so the link stays put.
+`refresh.py` uses the standard library only — no pip install. `dashboard.html` opens directly in a
+browser from disk; it needs no server and no credentials.
 
-`dashboard.html` also opens directly in a browser from disk; it needs no server and no credentials.
+**The published artifact does not update itself.** Its data is embedded at build time, so the hourly
+task refreshes the local file only. To move a refresh onto the claude.ai link, ask Claude to republish
+`dashboard.html` to the same artifact URL.
 
 ## Files
 
@@ -22,6 +34,8 @@ only — no pip install. Then republish `dashboard.html` to the same artifact UR
 | --- | --- |
 | `config.json` | Endpoint and credentials. **Not committed** (see `.gitignore`). |
 | `refresh.py` | Fetch, filter, aggregate, and inject data into the template. |
+| `run_refresh.ps1` | What the hourly task runs: calls `refresh.py`, timestamps the output into `refresh.log`, trims the log to 1,000 lines. |
+| `refresh.log` | Generated. Run history and errors. Not committed. |
 | `dashboard.template.html` | The dashboard. Edit this, never `dashboard.html`. |
 | `dashboard.html` | Generated. Overwritten on every refresh. |
 | `data.json` | Generated. The aggregated payload, handy for checking figures. |
@@ -51,6 +65,15 @@ Note for anyone extending the queries: **never add `$top`**. Business Central tr
 **Total MT** — `WIN_Total_Qty_in_Kg / 1000`, counted **only on rows where
 `Item_Ledger_Entry_Quantity <> 0`**.
 
+Where BC has left `WIN_Conversion_to_Kg` unset (so the kg field is 0 and the tonnage would
+silently vanish), the factor is derived from the item's base unit of measure instead. The UOM
+codes are self-describing and encode kg per unit: `KG`=1, `MT`=1000, `DRUM-200`=200,
+`IBC-1250`=1250, `CARB-25`=25, `BAG-1000`=1000. This is not a guess — the derivation reproduces
+BC's own stored factor on all 3,593 rows where BC has one, with zero mismatches. Units that carry
+no weight (`PCS`, `EACH`, `UNIT`, `JOB`) stay excluded from tonnage. Every substitution and every
+exclusion is printed by `refresh.py` and shown on the dashboard, so the gap is never silent. Set
+`derive_missing_conversion` to `false` in `config.json` for the literal rule with no fallback.
+
 This is the part worth understanding. BC writes several value entries per goods movement — the original,
 a cost adjustment, the invoice's reversal of expected cost, and the invoice's actual — and repeats the
 *same* kilogram figure on every one. Only the originating entry carries an item ledger quantity. Summing
@@ -68,23 +91,30 @@ the true figure.
 
 Volume and cost are negative for outbound sales in BC and are **negated** for display, not `abs()`'d — a
 return or credit memo carries the opposite sign and has to subtract. Taking `abs()` per bucket turns
-those reversals into additions; it inflated MT and COGS on the first build until the control totals
+those reversals into additions; it inflated MT and COGS on the first build until the totals check
 caught it.
 
-## Control totals
+## Self-checks
 
-`refresh.py` checks the full-period totals against `CONTROL_TOTALS` on every run and reports loudly if
-they move. As at the 2026-04-01 → 2026-08-28 data:
+Because the refresh is unattended, `refresh.py` guards its own output rather than trusting it.
 
-| Measure | Value |
-| --- | --- |
-| Total MT | 93,548.61 |
-| Total revenue | 26,128,244.00 |
-| Total cost of sales | 25,115,282.42 |
-| Gross profit | 1,012,961.58 (3.88%) |
+**Sanity gate — refuses to write.** Every measure must be positive, and revenue per MT must fall in the
+50–2,000 band (it currently sits near 279). This is the tripwire for the two bugs that actually happened
+during development: removing the volume dedupe inflates MT about 12× and drags revenue per MT down to
+roughly 23, and a sign error moves it similarly. On failure the script exits non-zero **without writing
+anything**, so a broken run leaves the last good `dashboard.html` in place and Task Scheduler shows a
+non-zero Last Run Result. This was verified by injecting the dedupe bug: the run refused at 22.81 per MT
+and the dashboard was left untouched.
 
-These will legitimately move once BC has new postings. When they do, confirm the new figures look right,
-then update `CONTROL_TOTALS`. Set `CHECK_TOTALS=0` to skip the check.
+**Drift warning — logs only.** Each run compares its totals with the previous run's and notes any
+measure that moved more than 25%. Ordinary trading never trips it; a code change or a bulk backposting
+does. It is a warning, not a failure, because a genuine large backposting is possible.
+
+Set `CHECK_TOTALS=0` to skip both.
+
+An earlier version compared against a frozen set of expected totals. That was the right tool for a
+one-off build and the wrong one for an hourly job — it began warning on every single run the moment BC
+posted new data, which is exactly the noise that trains you to ignore a log.
 
 ## Two things to be aware of
 
@@ -101,5 +131,5 @@ sample document, so this reflects the source data rather than a formula error. W
 
 The browser cannot call BC directly: the host serves a self-signed certificate, sends no CORS headers,
 and Basic auth credentials must never ship to a client. So `refresh.py` holds the credentials and the
-page holds only the aggregate — 2,499 rows at (customer × product group × posting date) grain, about
+page holds only the aggregate — about 2,500 rows at (customer × product group × posting date) grain,
 129 KB, which is enough for every filter combination to recompute instantly in the browser.

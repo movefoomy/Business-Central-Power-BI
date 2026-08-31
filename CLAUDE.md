@@ -15,9 +15,14 @@ No package manager, no build tool, no test framework. `refresh.py` is standard-l
 ## Commands
 
 ```bash
-python refresh.py            # fetch -> filter -> aggregate -> rebuild data.json + dashboard.html
-CHECK_TOTALS=0 python refresh.py   # skip the control-total assertion
+python refresh.py                  # fetch -> filter -> aggregate -> rebuild data.json + dashboard.html
+CHECK_TOTALS=0 python refresh.py   # skip the sanity and drift checks
 ```
+
+A Windows scheduled task, **BC Sales Margin Refresh**, runs `run_refresh.ps1` hourly (interactive logon,
+no stored password) and appends to `refresh.log`. Inspect it with `Get-ScheduledTaskInfo -TaskName
+'BC Sales Margin Refresh'` — `LastTaskResult` 0 is success. The hourly job refreshes the **local file
+only**; the published artifact embeds its data at build time and must be republished by Claude.
 
 There is nothing to install and nothing to lint. To republish after a refresh, call the Artifact tool on
 `dashboard.html` — republishing the **same file path** keeps the existing URL; from a different
@@ -40,7 +45,7 @@ BC OData ──refresh.py──> data.json ──┐
 
 The data is embedded rather than fetched live because the browser cannot reach BC: self-signed cert, no
 CORS headers, and Basic auth credentials must never ship to a client. The page carries only the
-aggregate — 2,499 rows at (customer × product group × posting date) grain, ~129 KB — which is enough for
+aggregate — about 2,500 rows at (customer × product group × posting date) grain, ~129 KB — enough for
 every filter combination to recompute instantly client-side. Keep it that way; do not add a live fetch.
 
 Credentials live in `config.json` (gitignored). Never inline them into the template.
@@ -64,32 +69,38 @@ actual.
 
 - **Volume** counts rows where `Item_Ledger_Entry_Quantity <> 0` **only**. `WIN_Total_Qty_in_Kg` repeats
   the same figure on every one of those rows, and only the originating entry carries an item ledger
-  quantity. Summing every row overstates volume ~12× (1,146,035 MT vs the correct 93,549 MT).
+  quantity. Summing every row overstates volume ~12×. Verified: 3,597 qty-bearing rows map to 3,597
+  distinct item ledger entries, so the condition counts each goods movement exactly once.
+- **Missing conversions.** `WIN_Conversion_to_Kg` is kg per base unit and is sometimes unset, which
+  would drop that shipment's tonnage silently. `kg_per_unit()` derives it from the item's base UOM
+  (`KG`=1, `MT`=1000, and packaging codes embed their fill weight: `DRUM-200`=200, `IBC-1250`=1250).
+  This reproduces BC's stored factor on all 3,593 rows that have one — do not treat it as a guess.
+  `PCS`/`EACH`/`UNIT`/`JOB` carry no weight and stay excluded. Both outcomes are reported in the log
+  and rendered in the dashboard footer; keep them visible rather than absorbing them.
 - **Revenue and cost** sum **all** rows — `Sales_Amount_Actual_New + Sales_Amount_Expected_New` and
   `Cost_Amount_Actual + Cost_Amount_Expected`. The expected amount posts on the shipment and is reversed
   by the invoice, which carries the actual, so only the full set nets to the true figure.
 
 Volume and cost are negative for outbound sales and are **negated** for display — never `abs()`. A return
 or credit memo carries the opposite sign and must subtract; `abs()` per bucket turns those reversals into
-additions. This shipped as a bug on the first build and the control totals caught it.
+additions. This shipped as a bug on the first build and was caught by the totals check.
 
 Scope filters: the four sales document types, `Source_No ne 'ZZZZZ'`, `Posting_Date ge 2023-04-01`, and
 client-side removal of item codes beginning `YY` (delivery charges — revenue but zero tonnage).
 
 ## Verification
 
-`refresh.py` asserts full-period totals against `CONTROL_TOTALS` on every run and reports loudly on
-drift. Current values:
+Since the refresh runs unattended, `refresh.py` guards its own output. Do not weaken these into
+print-only warnings.
 
-| Measure | Value |
-| --- | --- |
-| Total MT | 93,548.61 |
-| Total revenue | 26,128,244.00 |
-| Total cost of sales | 25,115,282.42 |
-| Gross profit | 1,012,961.58 (3.88%) |
+- **Sanity gate (refuses to write).** All measures positive, and revenue per MT within 50–2,000
+  (currently ~279). Removing the volume dedupe inflates MT ~12× and drops this to ~23; a sign error
+  moves it similarly. On failure it exits non-zero *before writing*, so the last good `dashboard.html`
+  survives. Verified by fault injection.
+- **Drift warning (logs only).** Flags any headline measure moving >25% versus the previous run.
 
-These will legitimately move once BC has new postings — confirm the new figures look right, then update
-`CONTROL_TOTALS`. Treat an unexplained move as a sign or dedupe regression, not as noise.
+Do not reintroduce a frozen expected-totals check: it warned on every run as soon as BC posted new
+data, which is how a log gets ignored.
 
 To check the page's own logic rather than the pipeline's, extract `compute()` out of `dashboard.html`
 with a regex and run it in Node against the embedded blob — that tests shipped code instead of a

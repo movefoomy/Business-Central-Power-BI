@@ -18,6 +18,7 @@
   --accent-soft: #eaf2fd;
   --pos:         #0b6b46;
   --neg:         #b7332f;
+  --warn:        #8a5a00;
   --focus:       #2a78d6;
   --shadow:      0 1px 2px rgba(14,20,25,.05), 0 1px 12px rgba(14,20,25,.04);
 
@@ -39,6 +40,7 @@
     --accent-soft: #1b2a3d;
     --pos:         #45c08d;
     --neg:         #f0817c;
+    --warn:        #e0a83c;
     --focus:       #5a9ded;
     --shadow:      0 1px 2px rgba(0,0,0,.3), 0 1px 12px rgba(0,0,0,.22);
 
@@ -60,6 +62,7 @@
   --accent-soft: #1b2a3d;
   --pos:         #45c08d;
   --neg:         #f0817c;
+  --warn:        #e0a83c;
   --focus:       #5a9ded;
   --shadow:      0 1px 2px rgba(0,0,0,.3), 0 1px 12px rgba(0,0,0,.22);
 
@@ -96,8 +99,29 @@ h1, h2, .display { font-family: Archivo, ui-sans-serif, system-ui, sans-serif; }
   line-height: 1.15; text-wrap: balance;
 }
 .masthead .sub { margin: 5px 0 0; color: var(--ink-2); font-size: 13.5px; }
-.stamp { margin-left: auto; text-align: right; color: var(--ink-3); font-size: 11.5px; line-height: 1.6; }
-.stamp b { color: var(--ink-2); font-weight: 600; }
+.stamp {
+  margin-left: auto; display: flex; flex-direction: column;
+  align-items: flex-end; gap: 3px; text-align: right;
+}
+.stamp .lbl {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 10.5px; font-weight: 700; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--ink-3);
+}
+.stamp .dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--pos); flex: none;
+}
+.stamp .val {
+  font-size: 14px; font-weight: 600; color: var(--ink);
+  font-variant-numeric: tabular-nums; line-height: 1.3;
+}
+.stamp .ago { font-weight: 400; color: var(--ink-3); }
+.stamp .postings { font-size: 11.5px; color: var(--ink-3); margin-top: 2px; }
+.stamp .postings b { color: var(--ink-2); font-weight: 600; }
+/* The scheduled task runs hourly, so anything much older means it has stopped. */
+.stamp.stale .dot { background: var(--warn); }
+.stamp.stale .ago { color: var(--warn); font-weight: 600; }
 
 /* ---------- filter bar ---------- */
 .filters {
@@ -182,6 +206,11 @@ input[type="date"] { font-size: 13px; }
   border-radius: 10px; box-shadow: var(--shadow);
 }
 .card-head { padding: 16px 20px 13px; border-bottom: 1px solid var(--hairline-2); }
+.card-head.split {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 14px 20px; flex-wrap: wrap;
+}
+.measures { display: flex; gap: 6px; flex-wrap: wrap; }
 .card-head h2 { margin: 5px 0 0; font-size: 16px; font-weight: 600; letter-spacing: -.01em; }
 .card-head .hint { margin: 3px 0 0; font-size: 12px; color: var(--ink-2); }
 
@@ -189,7 +218,16 @@ input[type="date"] { font-size: 13px; }
 .chart-body { display: flex; align-items: center; gap: 18px; padding: 16px 20px 20px; }
 .donut-wrap { position: relative; flex: none; }
 .donut { display: block; }
-.donut path { transition: opacity .12s ease; cursor: default; }
+.donut path, .donut circle.seg { transition: opacity .12s ease; cursor: default; }
+/* One class carries the slot colour as --c; the SVG marks and the legend/tooltip
+   swatches all read it. Do NOT go back to fill="var(--sN)": var() is not resolved in
+   SVG presentation attributes, so the mark renders black. */
+.c1 { --c: var(--s1); } .c2 { --c: var(--s2); } .c3 { --c: var(--s3); }
+.c4 { --c: var(--s4); } .c5 { --c: var(--s5); } .c6 { --c: var(--s6); }
+.c7 { --c: var(--s7); }
+.donut path { fill: var(--c); }
+.donut circle.seg { fill: none; stroke: var(--c); }
+.donut circle.ring { fill: none; stroke: var(--hairline); }
 .donut.dim path:not(.hot) { opacity: .26; }
 .donut-mid {
   position: absolute; inset: 0; display: flex; flex-direction: column;
@@ -208,7 +246,7 @@ input[type="date"] { font-size: 13px; }
 }
 .legend .lg:first-child { border-top: 0; }
 .lg:hover { background: var(--surface-2); }
-.lg .sw { width: 10px; height: 10px; border-radius: 2px; }
+.lg .sw { width: 10px; height: 10px; border-radius: 2px; background: var(--c); }
 .lg .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
 .lg .vl { font-variant-numeric: tabular-nums; color: var(--ink-2); }
 .lg .pc { font-variant-numeric: tabular-nums; color: var(--ink-3); width: 46px; text-align: right; }
@@ -242,16 +280,20 @@ td.neg { color: var(--neg); }
 tfoot td { border-bottom: 0; border-top: 1px solid var(--hairline); font-weight: 700; background: var(--surface-2); }
 .no-rows { padding: 40px 16px; text-align: center; color: var(--ink-3); }
 
-/* margin bar: diverging around zero */
-td.bar { width: 108px; padding-right: 20px; }
-.bar-track { position: relative; height: 15px; }
-.bar-track::before {
-  content: ""; position: absolute; left: 50%; top: 0; bottom: 0;
-  width: 1px; background: var(--hairline);
+/* Monthly grid. Cell shading is a magnitude cue, so the eye finds the big months
+   without reading every figure; --h is the intensity, --tint the direction. */
+td.heat { background: color-mix(in srgb, var(--tint, var(--accent)) var(--h, 0%), transparent); }
+td.blank { color: var(--ink-3); }
+/* The customer column stays put when the months scroll sideways. */
+th.namecol, td.name {
+  position: sticky; left: 0; background: var(--surface);
+  border-right: 1px solid var(--hairline-2);
 }
-.bar-fill { position: absolute; top: 3px; height: 9px; border-radius: 2px; }
-.bar-fill.pos { left: 50%; background: var(--pos); }
-.bar-fill.neg { right: 50%; background: var(--neg); }
+th.namecol { z-index: 4; background: var(--surface-2); }
+td.name { z-index: 1; }
+tbody tr:hover td.name { background: var(--surface-2); }
+tfoot td.name { background: var(--surface-2); }
+th.totcol, td.tot { border-left: 1px solid var(--hairline); font-weight: 600; }
 
 /* ---------- tooltip ---------- */
 #tip {
@@ -262,11 +304,13 @@ td.bar { width: 108px; padding-right: 20px; }
   box-shadow: 0 6px 24px rgba(0,0,0,.18); padding: 9px 11px; font-size: 12.5px;
 }
 #tip .tt { font-weight: 600; margin-bottom: 3px; display: flex; align-items: center; gap: 7px; }
-#tip .sw { width: 9px; height: 9px; border-radius: 2px; flex: none; }
+#tip .sw { width: 9px; height: 9px; border-radius: 2px; flex: none; background: var(--c); }
 #tip .tr { color: var(--ink-2); font-variant-numeric: tabular-nums; }
 
 footer { margin-top: 26px; color: var(--ink-3); font-size: 11.5px; line-height: 1.7; }
 footer b { color: var(--ink-2); font-weight: 600; }
+footer .flag { color: var(--warn); }
+footer .flag b { color: var(--warn); }
 
 :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
@@ -280,7 +324,7 @@ footer b { color: var(--ink-2); font-weight: 600; }
   .chart-body { flex-direction: column; align-items: stretch; }
   .donut-wrap { align-self: center; }
   .filters { position: static; }
-  .stamp { margin-left: 0; text-align: left; }
+  .stamp { margin-left: 0; text-align: left; align-items: flex-start; }
 }
 </style>
 
@@ -291,9 +335,10 @@ footer b { color: var(--ink-2); font-weight: 600; }
       <h1>Sales Margin Control</h1>
       <p class="sub">Volume, revenue and cost of sales by customer &mdash; posted sales value entries from Business Central.</p>
     </div>
-    <div class="stamp">
-      <div>Refreshed <b id="gen"></b></div>
-      <div>Postings <b id="range"></b></div>
+    <div class="stamp" id="stamp">
+      <div class="lbl"><span class="dot" aria-hidden="true"></span>Last refreshed</div>
+      <div class="val"><span id="gen">&mdash;</span><span class="ago" id="ago"></span></div>
+      <div class="postings">Postings <b id="range"></b></div>
     </div>
   </header>
 
@@ -387,24 +432,17 @@ footer b { color: var(--ink-2); font-weight: 600; }
   </section>
 
   <section class="card">
-    <div class="card-head">
-      <p class="eyebrow">Detail</p>
-      <h2>Customer performance</h2>
-      <p class="hint" id="tbl-hint"></p>
+    <div class="card-head split">
+      <div>
+        <p class="eyebrow">Detail</p>
+        <h2>Customer performance by month</h2>
+        <p class="hint" id="tbl-hint"></p>
+      </div>
+      <div class="measures" id="measures" role="group" aria-label="Measure shown in the grid"></div>
     </div>
     <div class="table-scroll">
       <table>
-        <thead>
-          <tr>
-            <th data-k="name" scope="col"><button type="button">Customer</button></th>
-            <th data-k="mt"   scope="col"><button type="button">Total MT</button></th>
-            <th data-k="rev"  scope="col"><button type="button">Total revenue</button></th>
-            <th data-k="cogs" scope="col"><button type="button">Total cost of sales</button></th>
-            <th data-k="gp"   scope="col"><button type="button">Gross profit</button></th>
-            <th data-k="gpm"  scope="col"><button type="button">GP %</button></th>
-            <th scope="col"><span style="display:block;padding:11px 20px 11px 16px">Margin</span></th>
-          </tr>
-        </thead>
+        <thead id="thead"></thead>
         <tbody id="tbody"></tbody>
         <tfoot id="tfoot"></tfoot>
       </table>
@@ -412,7 +450,8 @@ footer b { color: var(--ink-2); font-weight: 600; }
   </section>
 
   <footer>
-    <div><b>Volume basis.</b> Tonnage counts each goods movement once &mdash; only value entries carrying an item ledger quantity. Business Central writes several value entries per shipment (original, cost adjustment, invoice reversal, invoice actual) and repeats the same kilogram figure on each, so summing every row overstates volume roughly twelvefold.</div>
+    <div><b>Volume basis.</b> Total MT is total quantity in kilograms divided by 1,000, taken only from value entries whose item ledger entry quantity is not zero. That condition is what counts each goods movement once: Business Central writes several value entries per shipment (original, cost adjustment, invoice reversal, invoice actual) and repeats the same kilogram figure on each, so summing every row overstates volume roughly twelvefold.</div>
+    <div id="mt-notes" class="flag" hidden></div>
     <div><b>Amount basis.</b> Revenue sums <span class="num">Sales_Amount_Actual_New + Sales_Amount_Expected_New</span> and cost of sales sums <span class="num">Cost_Amount_Actual + Cost_Amount_Expected</span> across all rows, so the expected amount posted on a shipment and its reversal on the invoice net to the true figure. Cost and volume are shown positive.</div>
     <div><b>Scope.</b> Sales shipments, invoices, return receipts and credit memos. Excludes source no. ZZZZZ and item codes beginning YY (delivery charges).</div>
   </footer>
@@ -452,34 +491,82 @@ function shiftDays(iso, days) {
    slot order, so a filter that drops a group never repaints the survivors. */
 const SLOTS = ["--s1", "--s2", "--s3", "--s4", "--s5", "--s6", "--s7"];
 const GROUPS = DATA.groups.slice();
-const colorOf = {};
-GROUPS.forEach((g, i) => { colorOf[g] = "var(" + SLOTS[i % SLOTS.length] + ")"; });
+const classOf = {};
+GROUPS.forEach((g, i) => { classOf[g] = "c" + ((i % SLOTS.length) + 1); });
 
 /* ---------- state ---------- */
-const state = { from: DATA.minDate, to: DATA.maxDate, picked: new Set(), sort: "rev", dir: -1 };
+const state = {
+  from: DATA.minDate, to: DATA.maxDate, picked: new Set(),
+  measure: "rev",   // which measure fills the monthly grid
+  sort: "total",    // "name", "total", or "m:YYYY-MM"
+  dir: -1,
+};
+
+/* The grid shows one measure at a time; months across, customers down. */
+const MEASURES = [
+  { k: "mt",   label: "Total MT",      cell: (v) => num2(v),    tot: (v) => num2(v),   div: false, unit: "MT" },
+  { k: "rev",  label: "Revenue",       cell: (v) => compact(v), tot: (v) => num2(v),   div: false, unit: "S$" },
+  { k: "cogs", label: "Cost of sales", cell: (v) => compact(v), tot: (v) => num2(v),   div: false, unit: "S$" },
+  { k: "gp",   label: "Gross profit",  cell: (v) => compact(v), tot: (v) => num2(v),   div: true,  unit: "S$" },
+  { k: "gpm",  label: "GP %",          cell: (v) => pct(v),     tot: (v) => pct(v),    div: true,  unit: "" },
+];
+const measure = () => MEASURES.find((x) => x.k === state.measure) || MEASURES[1];
+
+function monthLabel(ym) {
+  const [y, mo] = ym.split("-").map(Number);
+  return new Date(Date.UTC(y, mo - 1, 1))
+    .toLocaleDateString("en-GB", { month: "short", year: "numeric", timeZone: "UTC" });
+}
 const $ = (id) => document.getElementById(id);
 
 /* ---------- filtered aggregation ---------- */
+const measures = (kg, r, c) =>
+  ({ mt: kg / 1000, rev: r, cogs: c, gp: r - c, gpm: r ? (r - c) / r : 0 });
+
 function compute() {
   const byCust = new Map(), byGrpRev = new Map(), byGrpCog = new Map();
+  const monthSet = new Set();
   let mt = 0, rev = 0, cogs = 0;
   for (const [no, grp, date, kg, r, c] of DATA.rows) {
     if (date < state.from || date > state.to) continue;
     if (state.picked.size && !state.picked.has(no)) continue;
+    const ym = date.slice(0, 7);
+    monthSet.add(ym);
     let a = byCust.get(no);
-    if (!a) { a = [0, 0, 0]; byCust.set(no, a); }
-    a[0] += kg; a[1] += r; a[2] += c;
+    if (!a) { a = { t: [0, 0, 0], m: new Map() }; byCust.set(no, a); }
+    a.t[0] += kg; a.t[1] += r; a.t[2] += c;
+    let cell = a.m.get(ym);
+    if (!cell) { cell = [0, 0, 0]; a.m.set(ym, cell); }
+    cell[0] += kg; cell[1] += r; cell[2] += c;
     mt += kg; rev += r; cogs += c;
     byGrpRev.set(grp, (byGrpRev.get(grp) || 0) + r);
     byGrpCog.set(grp, (byGrpCog.get(grp) || 0) + c);
   }
+
+  const months = Array.from(monthSet).sort();
   const rows = [];
-  for (const [no, [kg, r, c]] of byCust) {
+  for (const [no, a] of byCust) {
+    const [kg, r, c] = a.t;
     // "Total in KG must not be 0" — a customer with no tonnage in range is not a sale.
     if (kg === 0) continue;
-    rows.push({ no, name: DATA.customers[no] || no, mt: kg / 1000, rev: r, cogs: c, gp: r - c, gpm: r ? (r - c) / r : 0 });
+    const byMonth = new Map();
+    for (const [ym, v] of a.m) byMonth.set(ym, measures(v[0], v[1], v[2]));
+    rows.push(Object.assign({ no, name: DATA.customers[no] || no, byMonth }, measures(kg, r, c)));
   }
-  return { rows, mt: mt / 1000, rev, cogs, gp: rev - cogs, byGrpRev, byGrpCog };
+
+  // Column totals, summed from the same rows the table shows so the footer always
+  // reconciles with what is above it.
+  const totalsByMonth = new Map();
+  for (const ym of months) {
+    let a = 0, b = 0, c = 0;
+    for (const row of rows) {
+      const v = row.byMonth.get(ym);
+      if (v) { a += v.mt * 1000; b += v.rev; c += v.cogs; }
+    }
+    totalsByMonth.set(ym, measures(a, b, c));
+  }
+
+  return { rows, months, totalsByMonth, mt: mt / 1000, rev, cogs, gp: rev - cogs, byGrpRev, byGrpCog };
 }
 
 /* ---------- KPIs ---------- */
@@ -518,29 +605,43 @@ function renderDonut(svgId, legId, totId, map, label) {
   const items = GROUPS.filter((g) => (map.get(g) || 0) > 0).map((g) => ({ g, v: map.get(g) }));
   const total = items.reduce((s, i) => s + i.v, 0);
   $(totId).textContent = total ? compact(total) : "—";
-  svg.textContent = ""; leg.textContent = "";
+  // Clear the marks but keep the title element, which aria-labelledby points at.
+  Array.prototype.slice.call(svg.children).forEach((n) => {
+    if (n.tagName.toLowerCase() !== "title") n.remove();
+  });
+  leg.textContent = "";
 
-  if (!total) {
+  const ring = (cls) => {
     const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
     c.setAttribute("cx", CX); c.setAttribute("cy", CY); c.setAttribute("r", R);
-    c.setAttribute("fill", "none"); c.setAttribute("stroke", "var(--hairline)");
     c.setAttribute("stroke-width", TH);
+    c.setAttribute("class", cls);
     svg.appendChild(c);
+    return c;
+  };
+
+  if (!total) {
+    ring("ring");
     leg.innerHTML = '<p class="empty-opt">No postings in this selection.</p>';
     return;
   }
 
   let a = -Math.PI / 2;
-  const solo = items.length === 1;
   items.forEach((it) => {
     const span = (it.v / total) * Math.PI * 2;
-    const g0 = solo ? 0 : GAP / 2;
-    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    path.setAttribute("d", arc(a + g0, a + Math.max(span - g0, g0 + 0.001)));
-    path.setAttribute("fill", colorOf[it.g]);
-    path.dataset.g = it.g;
-    svg.appendChild(path);
-    it.path = path;
+    if (items.length === 1) {
+      // A single 100% slice: an arc from a to a+2pi has identical end points and
+      // paints nothing, so draw the full ring as a stroked circle instead.
+      it.path = ring("seg " + classOf[it.g]);
+    } else {
+      const g0 = GAP / 2;
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", arc(a + g0, a + Math.max(span - g0, g0 + 0.001)));
+      path.setAttribute("class", classOf[it.g]);
+      svg.appendChild(path);
+      it.path = path;
+    }
+    it.path.dataset.g = it.g;
     a += span;
   });
 
@@ -548,7 +649,7 @@ function renderDonut(svgId, legId, totId, map, label) {
     const row = document.createElement("div");
     row.className = "lg";
     row.innerHTML =
-      '<span class="sw" style="background:' + colorOf[it.g] + '"></span>' +
+      '<span class="sw ' + classOf[it.g] + '"></span>' +
       '<span class="nm"></span><span class="vl"></span>' +
       '<span class="pc">' + pct(it.v / total) + "</span>";
     row.querySelector(".nm").textContent = it.g;
@@ -557,7 +658,7 @@ function renderDonut(svgId, legId, totId, map, label) {
 
     const on = (ev) => {
       svg.classList.add("dim"); it.path.classList.add("hot");
-      showTip(ev, it.g, colorOf[it.g],
+      showTip(ev, it.g, classOf[it.g],
         [label + " S$ " + num2(it.v), pct(it.v / total) + " of " + label.toLowerCase()]);
     };
     const off = () => { svg.classList.remove("dim"); it.path.classList.remove("hot"); hideTip(); };
@@ -571,8 +672,9 @@ function renderDonut(svgId, legId, totId, map, label) {
 
 /* ---------- tooltip ---------- */
 const tip = $("tip");
-function showTip(ev, title, color, lines) {
-  tip.innerHTML = '<div class="tt"><span class="sw" style="background:' + color + '"></span><span class="ttl"></span></div>' +
+function showTip(ev, title, cls, lines) {
+  tip.innerHTML = '<div class="tt">' + (cls ? '<span class="sw ' + cls + '"></span>' : "") +
+    '<span class="ttl"></span></div>' +
     lines.map(() => '<div class="tr"></div>').join("");
   tip.querySelector(".ttl").textContent = title;
   tip.querySelectorAll(".tr").forEach((el, i) => { el.textContent = lines[i]; });
@@ -591,61 +693,143 @@ function hideTip() { tip.style.opacity = "0"; }
 
 /* ---------- table ---------- */
 function renderTable(m) {
+  const meas = measure();
+  const months = m.months;
+  const val = (row, key) => key === "total"
+    ? row[meas.k]
+    : (row.byMonth.get(key.slice(2)) || {})[meas.k];
+
   const rows = m.rows.slice();
   const k = state.sort, d = state.dir;
-  rows.sort((a, b) => k === "name"
-    ? d * a.name.localeCompare(b.name)
-    : d * (a[k] - b[k]) || a.name.localeCompare(b.name));
+  rows.sort((a, b) => {
+    if (k === "name") return d * a.name.localeCompare(b.name);
+    const av = val(a, k), bv = val(b, k);
+    // Months a customer did not trade in sort below the ones they did.
+    if (av === undefined && bv === undefined) return a.name.localeCompare(b.name);
+    if (av === undefined) return 1;
+    if (bv === undefined) return -1;
+    return d * (av - bv) || a.name.localeCompare(b.name);
+  });
 
-  const worst = rows.reduce((s, r) => Math.max(s, Math.abs(r.gpm)), 0) || 1;
+  // Shade cells by magnitude relative to the largest month cell on screen.
+  let peak = 0;
+  for (const row of rows) {
+    for (const ym of months) {
+      const v = row.byMonth.get(ym);
+      if (v) peak = Math.max(peak, Math.abs(v[meas.k]));
+    }
+  }
+
+  const head = document.createElement("tr");
+  const th = (key, label, cls) => {
+    const el = document.createElement("th");
+    el.scope = "col";
+    if (cls) el.className = cls;
+    el.dataset.k = key;
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = label;
+    if (state.sort === key) {
+      el.setAttribute("aria-sort", d === 1 ? "ascending" : "descending");
+      const arrow = document.createElement("span");
+      arrow.className = "arrow";
+      arrow.textContent = d === 1 ? "▲" : "▼";
+      b.appendChild(arrow);
+    }
+    b.addEventListener("click", () => {
+      if (state.sort === key) state.dir *= -1;
+      else { state.sort = key; state.dir = key === "name" ? 1 : -1; }
+      render();
+    });
+    el.appendChild(b);
+    head.appendChild(el);
+  };
+  th("name", "Customer", "namecol");
+  for (const ym of months) th("m:" + ym, monthLabel(ym));
+  th("total", "Total", "totcol");
+  $("thead").textContent = "";
+  $("thead").appendChild(head);
+
   const tb = $("tbody");
   tb.textContent = "";
-
   if (!rows.length) {
-    tb.innerHTML = '<tr><td class="no-rows" colspan="7">No customers match these filters.</td></tr>';
+    tb.innerHTML = '<tr><td class="no-rows" colspan="' + (months.length + 2) +
+      '">No customers match these filters.</td></tr>';
   }
-  for (const r of rows) {
+
+  for (const row of rows) {
     const tr = document.createElement("tr");
-    const w = Math.min(Math.abs(r.gpm) / worst, 1) * 50;
-    tr.innerHTML =
-      '<td class="name"><span class="cn"></span><span class="code"></span></td>' +
-      '<td class="n mt"></td><td class="n rev"></td><td class="n cog"></td>' +
-      '<td class="n gp ' + (r.gp < 0 ? "neg" : "pos") + '"></td>' +
-      '<td class="n gpm ' + (r.gp < 0 ? "neg" : "pos") + '"></td>' +
-      '<td class="bar"><div class="bar-track"><div class="bar-fill ' +
-        (r.gp < 0 ? "neg" : "pos") + '" style="width:' + w.toFixed(2) + '%"></div></div></td>';
-    tr.querySelector(".cn").textContent = r.name;
-    tr.querySelector(".code").textContent = r.no;
-    tr.querySelector(".mt").textContent = num2(r.mt);
-    tr.querySelector(".rev").textContent = num2(r.rev);
-    tr.querySelector(".cog").textContent = num2(r.cogs);
-    tr.querySelector(".gp").textContent = num2(r.gp);
-    tr.querySelector(".gpm").textContent = pct(r.gpm);
+    const nameCell = document.createElement("td");
+    nameCell.className = "name";
+    nameCell.innerHTML = '<span class="cn"></span><span class="code"></span>';
+    nameCell.querySelector(".cn").textContent = row.name;
+    nameCell.querySelector(".code").textContent = row.no;
+    tr.appendChild(nameCell);
+
+    for (const ym of months) {
+      const v = row.byMonth.get(ym);
+      const td = document.createElement("td");
+      td.className = "n";
+      if (!v) {
+        td.classList.add("blank");
+        td.textContent = "—";
+      } else {
+        const x = v[meas.k];
+        td.textContent = meas.cell(x);
+        if (meas.div) td.classList.add(x < 0 ? "neg" : "pos");
+        if (peak) {
+          td.classList.add("heat");
+          td.style.setProperty("--h", (4 + 44 * Math.min(Math.abs(x) / peak, 1)).toFixed(1) + "%");
+          td.style.setProperty("--tint", meas.div ? (x < 0 ? "var(--neg)" : "var(--pos)") : "var(--accent)");
+        }
+        attachCellTip(td, row.name, ym, v);
+      }
+      tr.appendChild(td);
+    }
+
+    const tot = document.createElement("td");
+    tot.className = "n tot" + (meas.div ? (row[meas.k] < 0 ? " neg" : " pos") : "");
+    tot.textContent = meas.tot(row[meas.k]);
+    attachCellTip(tot, row.name, null, row);
+    tr.appendChild(tot);
     tb.appendChild(tr);
   }
 
-  $("tfoot").innerHTML =
-    "<tr><td>Total &mdash; " + rows.length + (rows.length === 1 ? " customer" : " customers") + "</td>" +
-    '<td class="n">' + num2(m.mt) + "</td>" +
-    '<td class="n">' + num2(m.rev) + "</td>" +
-    '<td class="n">' + num2(m.cogs) + "</td>" +
-    '<td class="n ' + (m.gp < 0 ? "neg" : "pos") + '">' + num2(m.gp) + "</td>" +
-    '<td class="n ' + (m.gp < 0 ? "neg" : "pos") + '">' + (m.rev ? pct(m.gp / m.rev) : "—") + "</td>" +
-    "<td></td></tr>";
+  const foot = document.createElement("tr");
+  const fname = document.createElement("td");
+  fname.className = "name";
+  fname.textContent = "Total — " + rows.length + (rows.length === 1 ? " customer" : " customers");
+  foot.appendChild(fname);
+  for (const ym of months) {
+    const v = m.totalsByMonth.get(ym);
+    const td = document.createElement("td");
+    td.className = "n" + (meas.div ? (v[meas.k] < 0 ? " neg" : " pos") : "");
+    td.textContent = meas.tot(v[meas.k]);
+    attachCellTip(td, "All customers", ym, v);
+    foot.appendChild(td);
+  }
+  const ftot = document.createElement("td");
+  const grand = meas.k === "gpm" ? (m.rev ? m.gp / m.rev : 0) : m[meas.k];
+  ftot.className = "n tot" + (meas.div ? (grand < 0 ? " neg" : " pos") : "");
+  ftot.textContent = meas.tot(grand);
+  attachCellTip(ftot, "All customers", null, Object.assign({}, m, { gpm: m.rev ? m.gp / m.rev : 0 }));
+  foot.appendChild(ftot);
+  $("tfoot").textContent = "";
+  $("tfoot").appendChild(foot);
+}
 
-  document.querySelectorAll("thead th[data-k]").forEach((th) => {
-    const on = th.dataset.k === k;
-    if (on) th.setAttribute("aria-sort", d === 1 ? "ascending" : "descending");
-    else th.removeAttribute("aria-sort");
-    const b = th.querySelector("button");
-    b.textContent = b.dataset.label || (b.dataset.label = b.textContent.trim());
-    if (on) {
-      const s = document.createElement("span");
-      s.className = "arrow";
-      s.textContent = d === 1 ? "▲" : "▼";
-      b.appendChild(s);
-    }
-  });
+/* Every cell shows one measure, so the hover carries the other four at full precision. */
+function attachCellTip(td, name, ym, v) {
+  const lines = [
+    "Total MT  " + num2(v.mt),
+    "Revenue  S$ " + num2(v.rev),
+    "Cost of sales  S$ " + num2(v.cogs),
+    "Gross profit  S$ " + num2(v.gp) + "  (" + pct(v.gpm) + ")",
+  ];
+  const title = name + (ym ? " · " + monthLabel(ym) : " · all months");
+  td.addEventListener("mouseenter", (ev) => showTip(ev, title, null, lines));
+  td.addEventListener("mousemove", (ev) => moveTip(ev));
+  td.addEventListener("mouseleave", hideTip);
 }
 
 /* ---------- customer picker ---------- */
@@ -737,29 +921,91 @@ function render() {
   renderPickLabel();
   syncPresets();
   if (!$("panel").hidden) renderOpts(m);
+  document.querySelectorAll("#measures .chip").forEach((b) => {
+    b.setAttribute("aria-pressed", String(b.dataset.m === state.measure));
+  });
+  const meas = measure();
   $("tbl-hint").textContent =
+    meas.label + (meas.unit ? " (" + meas.unit + ")" : "") + " by month · " +
     niceDate(state.from) + " – " + niceDate(state.to) +
     (state.picked.size ? " · " + state.picked.size + " customer filter" + (state.picked.size > 1 ? "s" : "") : "") +
-    " · sorted by " + ({ name: "customer", mt: "total MT", rev: "revenue", cogs: "cost of sales", gp: "gross profit", gpm: "GP %" })[state.sort];
+    " · hover any cell for all measures";
 }
 
 /* ---------- wiring ---------- */
+/* Items whose kilogram conversion is missing in BC. Surfaced rather than absorbed
+   silently, because it is the one thing that can make Total MT understate reality. */
+(function renderMtNotes() {
+  const n = DATA.mtNotes || {};
+  const derived = n.derived || [], weightless = n.weightless || [];
+  if (!derived.length && !weightless.length) return;
+  const el = $("mt-notes");
+  const parts = [];
+  if (derived.length) {
+    const kg = derived.reduce((s, e) => s + e.kg, 0);
+    parts.push("<b>Conversion missing in Business Central.</b> " +
+      derived.map((e) => e.item + " (" + e.desc + ") has no kg conversion set, so its base unit of measure " +
+        e.uom + " was used instead: " + num2(e.units) + " units = " + num2(e.kg) + " kg across " +
+        e.docs + (e.docs === 1 ? " document" : " documents") +
+        (e.customers.length ? " for " + e.customers.join(", ") : "")).join("; ") +
+      ". That recovers " + num2(kg / 1000) + " MT that would otherwise be missing. Set the conversion on these items to remove this notice.");
+  }
+  if (weightless.length) {
+    parts.push("<b>Excluded from tonnage.</b> " +
+      weightless.map((e) => e.item + " (" + e.desc + ") is sold in " + e.uom +
+        ", which carries no weight: " + num2(e.units) + " units").join("; ") + ".");
+  }
+  el.innerHTML = parts.map((p) => "<div>" + p + "</div>").join("");
+  el.hidden = false;
+})();
+
 $("co").textContent = DATA.company;
-$("gen").textContent = DATA.generated;
 $("range").textContent = niceDate(DATA.minDate) + " – " + niceDate(DATA.maxDate);
+
+/* Last-refreshed stamp. The absolute time is the build machine's local time, as
+   formatted at refresh; the relative age is recomputed from the offset-aware ISO
+   stamp so it stays correct for a viewer in any timezone. */
+const STALE_AFTER_MIN = 90;  // the task runs hourly, so 90 min means it has stopped
+function renderStamp() {
+  $("gen").textContent = DATA.generated || "—";
+  const el = $("ago"), stamp = $("stamp");
+  const t = DATA.generatedISO ? Date.parse(DATA.generatedISO) : NaN;
+  if (!Number.isFinite(t)) { el.textContent = ""; return; }
+  const mins = Math.max(0, Math.round((Date.now() - t) / 60000));
+  const ago = mins < 1 ? "just now"
+    : mins < 60 ? mins + " min ago"
+    : mins < 1440 ? Math.round(mins / 60) + (Math.round(mins / 60) === 1 ? " hour ago" : " hours ago")
+    : Math.round(mins / 1440) + (Math.round(mins / 1440) === 1 ? " day ago" : " days ago");
+  el.textContent = " · " + ago;
+  const stale = mins > STALE_AFTER_MIN;
+  stamp.classList.toggle("stale", stale);
+  stamp.title = stale
+    ? "This data is " + ago + ". The hourly refresh may have stopped — check the BC Sales Margin Refresh scheduled task."
+    : "Refreshes hourly from Business Central.";
+}
+renderStamp();
+setInterval(renderStamp, 30000);
 for (const el of [$("from"), $("to")]) { el.min = DATA.minDate; el.max = DATA.maxDate; }
 
 $("from").addEventListener("change", (e) => { state.from = e.target.value || DATA.minDate; render(); });
 $("to").addEventListener("change", (e) => { state.to = e.target.value || DATA.maxDate; render(); });
 
-document.querySelectorAll("thead th[data-k] button").forEach((b) => {
-  b.addEventListener("click", () => {
-    const k = b.parentElement.dataset.k;
-    if (state.sort === k) state.dir *= -1;
-    else { state.sort = k; state.dir = k === "name" ? 1 : -1; }
-    render();
-  });
-});
+function buildMeasures() {
+  const host = $("measures");
+  for (const mm of MEASURES) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "chip";
+    b.textContent = mm.label;
+    b.dataset.m = mm.k;
+    b.addEventListener("click", () => {
+      state.measure = mm.k;
+      // A month sort stays meaningful across measures; a stale total sort does too.
+      render();
+    });
+    host.appendChild(b);
+  }
+}
 
 const panel = $("panel");
 $("pick").addEventListener("click", () => {
@@ -782,11 +1028,12 @@ document.addEventListener("keydown", (e) => {
 });
 $("reset").addEventListener("click", () => {
   state.from = DATA.minDate; state.to = DATA.maxDate; state.picked.clear();
-  state.sort = "rev"; state.dir = -1;
+  state.measure = "rev"; state.sort = "total"; state.dir = -1;
   $("search").value = "";
   render();
 });
 
 buildPresets();
+buildMeasures();
 render();
 </script>
