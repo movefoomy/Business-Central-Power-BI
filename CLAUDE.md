@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this is
 
 A single dashboard, "Sales Margin Control", over Business Central sales value entries for
-**CI Manufacturing Pte. Ltd**. Four KPI tiles, two product-mix donuts, and a monthly grid of customers
+**CI Manufacturing Pte. Ltd**. Four KPI tiles, two product-mix bar charts, and a monthly grid of customers
 showing MT, revenue, cost of sales, gross profit and GP % for every month. Published as an Artifact:
 <https://claude.ai/code/artifact/e9a57277-d2fd-41aa-8ecb-7e077b5aeab1>
 
@@ -103,7 +103,7 @@ The refresh is unattended, so `refresh.py` guards its own output. Do not weaken 
 **Never reintroduce frozen expected values** — not in `refresh.py`, not in a test. A `CONTROL_TOTALS`
 constant was tried and began warning on every run within a day of BC posting new data; a test asserting
 fixed totals rotted the same way. BC changes hourly. Assert invariants instead: months sum to the Total
-column, the grid sums to the KPI tiles, donut slices sum to their tile, GP = revenue − COGS per cell,
+column, the grid sums to the KPI tiles, bar values sum to their tile, GP = revenue − COGS per cell,
 GP % derived never summed, filters only ever narrow, empty ranges yield zeroes not NaN.
 
 To test the page rather than the pipeline, slice `compute()` out of `dashboard.html` and run it in Node
@@ -115,17 +115,25 @@ merge every matching rule.
 
 ## Dashboard conventions
 
+**The `hidden` attribute needs its own `!important` rule.** The browser's default
+`[hidden] { display: none }` comes from the UA stylesheet, so *any* author `display` outranks it.
+`.panel` sets `display: flex`, which made `panel.hidden = true` a no-op: the customer picker set the
+attribute correctly on every close path and stayed on screen regardless. The Artifact host injects
+`[hidden]{display:none!important}` into the wrapper it supplies, so the published page behaved while
+the identical file opened from disk did not — the bug was invisible in exactly the place it was most
+often looked at. The template now declares `[hidden] { display: none !important; }` itself.
+**Do not remove it.** More generally: the page must not depend on anything the host injects, and a
+change to open/close behaviour has to be checked from disk as well as published.
+
 **SVG fill must come from CSS, never a presentation attribute.** `fill="var(--s1)"` is not resolved by
 any browser; the attribute is discarded and the mark falls back to black, which on the dark surface is
-invisible. This shipped and made both donuts disappear. A `.c1`–`.c7` class sets `--c` and CSS rules
-(`.donut path { fill: var(--c) }`) consume it. The same applies to `stroke`.
-
-**A 360° arc is degenerate.** Start and end points coincide and nothing paints, so a lone 100% slice is
-drawn as a stroked `<circle>`, not a path.
+invisible. This shipped and made both product-mix charts disappear, back when they were donuts. A
+`.c1`–`.c7` class sets `--c` and CSS rules consume it — `.bfill { background: var(--c) }` for today's
+bars. The same applies to `stroke`.
 
 Seven product groups map to seven fixed palette slots (`--s1`…`--s7`) from `DATA.groups`. **Colour
 follows the product group, never its rank** — a filter that drops a group must not repaint the survivors,
-and both donuts must share the mapping. Slices are drawn in fixed group order, not by value, so
+and both charts must share the mapping. Rows are drawn in fixed group order, not by value, so
 neighbours are always adjacent palette slots — the pairing the palette was validated on. If you change
 these hues, re-run the dataviz skill's `validate_palette.js` in light and dark.
 
@@ -154,7 +162,9 @@ Theme tokens are declared three times — bare `:root`, `@media (prefers-color-s
 defined solely inside a media or `[data-theme]` block breaks the un-stamped default state.
 
 The generated page has no `<!doctype>`/`<html>`/`<body>` wrapper — deliberate, the Artifact host supplies
-it. It still renders from disk.
+it. It still renders from disk. **Do not add one**, but do remember that everything else in that wrapper
+is absent from disk too: that is how the `[hidden]` bug above survived, and it is why "works in the
+artifact" is not evidence that the file works.
 
 ## Known data issues, not bugs
 

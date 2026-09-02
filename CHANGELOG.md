@@ -13,7 +13,27 @@ tracked here — only changes to the pipeline, the template and the documentatio
 
 ## Unreleased
 
+### Fixed
+
+- **The customer picker could not be closed when the page was opened from disk.** The browser's default
+  `[hidden] { display: none }` is a UA-stylesheet rule, so `.panel { display: flex }` outranked it and
+  `panel.hidden = true` had no visual effect. Every close path — the Customer button, a click outside,
+  Escape — set the attribute correctly and left the panel on screen. The Artifact host injects
+  `[hidden]{display:none!important}` into the wrapper it supplies, so the published page was unaffected
+  and the bug only appeared in the local file. The template now declares the rule itself, and both
+  contexts behave identically.
+  - `#mt-notes` uses the same attribute. It has no competing `display` rule so it was never broken, but
+    it is now covered by the same guarantee.
+
 ### Changed
+
+- `CLAUDE.md` brought in line with the code: the opening description still said "two product-mix
+  donuts", stale since `7c4d7af` swapped them for bar charts, and the palette convention referred to
+  donut slices and `.donut path`. Added the `[hidden]` rule as a standing convention, and recorded the
+  general lesson — the page must not depend on anything the Artifact host injects, so "works in the
+  artifact" is not evidence that the file works from disk.
+- Dropped the "a 360° arc is degenerate" note from `CLAUDE.md`. It described the lone-100%-slice case in
+  the donut renderer, which no longer exists.
 
 - **`README.md` substantially rewritten** to match the code as it now stands. It had fallen behind by
   one commit and carried several outright errors.

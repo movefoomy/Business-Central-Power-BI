@@ -72,6 +72,15 @@
 
 /* ---------- base ---------- */
 * { box-sizing: border-box; }
+
+/* The hidden attribute must outrank our own display rules. The browser's default
+   [hidden] { display: none } is a UA rule, so ANY author display beats it -- .panel
+   sets display:flex, which meant panel.hidden = true had no visual effect and the
+   customer picker could never be closed. The Artifact host injects an !important
+   version of this rule, so the published page worked while the same file opened from
+   disk did not. Declare it ourselves so both contexts behave identically. */
+[hidden] { display: none !important; }
+
 body {
   background: var(--ground);
   color: var(--ink);

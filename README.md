@@ -16,7 +16,9 @@ together.
 - Posting date **from / to**, plus quick ranges: All time, Last 30 days, Last 90 days, and
   **Financial YTD** (the year starts 1 April, so before April it reaches back into the prior year).
 - A **customer picker** — multi-select with a search box, Select all and Clear. The button reports
-  the selection ("All customers", the name when one is picked, otherwise a count).
+  the selection ("All customers", the name when one is picked, otherwise a count). It stays open while
+  you tick, so several customers can be chosen in one go; close it with the Customer button again, a
+  click anywhere outside it, or Escape.
 - **Reset filters** returns everything to the full range and all customers.
 
 **Four KPI tiles** — total volume, revenue, cost of sales and gross profit for the current selection.
