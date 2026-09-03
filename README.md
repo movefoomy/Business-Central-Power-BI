@@ -127,14 +127,17 @@ Three OData collections are read, all under the same service root. `refresh.py` 
 
 | Entity | `$select` | Why |
 | --- | --- | --- |
-| `PBI_ValueEntriesPage` | `Source_No, Item_No, Document_No, Gen_Prod_Posting_Group, Posting_Date, Item_Ledger_Entry_Quantity, WIN_Total_Qty_in_Kg, Sales_Amount_Actual_New, Sales_Amount_Expected_New, Cost_Amount_Actual, Cost_Amount_Expected` | Every figure on the dashboard. |
+| `PBI_ValueEntries_New` | 39 fields — see `VALUE_ENTRY_SELECT` in `refresh.py`. Eleven drive the figures: `Source_No, Item_No, Document_No, Gen_Prod_Posting_Group, Posting_Date, Item_Ledger_Entry_Quantity, WIN_Total_Qty_in_Kg, Sales_Amount_Actual, Sales_Amount_Expected, Cost_Amount_Actual, Cost_Amount_Expected`. | Every figure on the dashboard. |
 | `PBI_Customer` | `Customer_No, Customer_Name` | Customer names, joined `Source_No` → `Customer_No`. Returns one row per ledger entry, so it is collapsed to a no → name map. |
 | `PBI_Item` | `No, Description, Base_Unit_of_Measure` | The base UOM behind the tonnage fallback, and item descriptions for the conversion notes. |
 
-Use `PBI_ValueEntriesPage` — **not** `PBI_ValueEntries`, which exposes neither `Source_No` (so it
-cannot be linked to a customer) nor the `_New` amount and kilogram fields.
+Use `PBI_ValueEntries_New` — **not** `PBI_ValueEntries`, which exposes neither `Source_No` (so it
+cannot be linked to a customer) nor the amount and kilogram fields. It replaced
+`PBI_ValueEntriesPage`, which carried the same rows but published the sales amounts under a `_New`
+suffix (`Sales_Amount_Actual_New`) and lacked `Inventory_Posting_Group`, `Reason_Code` and
+`Cost_Posted_to_GL`. The swap was verified to reproduce the previous payload exactly.
 
-Server-side filter, applied to `PBI_ValueEntriesPage` only:
+Server-side filter, applied to the value entries only:
 
 ```
 (Document_Type eq 'Sales Shipment' or 'Sales Invoice' or 'Sales Return Receipt' or 'Sales Credit Memo')
@@ -173,7 +176,7 @@ with zero mismatches. Every substitution and every exclusion is printed by `refr
 the dashboard footer, so the gap is never silent. Set `derive_missing_conversion` to `false` for the
 literal rule with no fallback.
 
-**Total revenue** — `Sales_Amount_Actual_New + Sales_Amount_Expected_New` across **all** rows.
+**Total revenue** — `Sales_Amount_Actual + Sales_Amount_Expected` across **all** rows.
 
 **Total cost of sales** — `Cost_Amount_Actual + Cost_Amount_Expected` across **all** rows.
 

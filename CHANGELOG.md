@@ -13,6 +13,25 @@ tracked here — only changes to the pipeline, the template and the documentatio
 
 ## Unreleased
 
+### Changed
+
+- **The value-entry source moved from `PBI_ValueEntriesPage` to `PBI_ValueEntries_New`**, with the
+  39-field `$select` agreed for that endpoint. The new page carries the same rows and adds
+  `Inventory_Posting_Group`, `Reason_Code` and `Cost_Posted_to_GL`; the sales amounts lost the `_New`
+  field-name suffix (`Sales_Amount_Actual_New` → `Sales_Amount_Actual`), which is the only code change
+  the swap required beyond the entity name.
+  - Verified rather than assumed: the regenerated `data.json` is identical to the previous run's
+    field for field — same 2,597 aggregate rows, same 98 customers, same 7 groups, same date range,
+    same conversion notes, and Total MT / revenue / COGS matching to the cent. Only the timestamp
+    differs.
+  - The entity and its field list are now the constants `VALUE_ENTRY_ENTITY` and `VALUE_ENTRY_SELECT`
+    rather than literals inside `build()`. Eleven of the 39 fields feed the aggregation; the rest are
+    selected to keep the query identical to the one documented for the endpoint, and cost only
+    bandwidth. Fetch time was unaffected (~15s for 35,861 rows).
+  - `PBI_ValueEntries_New` previously lacked `WIN_Total_Qty_in_Kg` and `WIN_Conversion_to_Kg`, which
+    would have left Total MT with no source. Both were added to the page in BC, so the migration became
+    possible; a `$metadata` check confirmed all 39 fields before any code was touched.
+
 ### Fixed
 
 - **The customer picker could not be closed when the page was opened from disk.** The browser's default

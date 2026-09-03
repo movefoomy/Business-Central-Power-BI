@@ -54,8 +54,12 @@ Credentials live in `config.json` (gitignored). Never inline them into the templ
 
 ## Source data — non-obvious
 
-Use **`PBI_ValueEntriesPage`**, never `PBI_ValueEntries`. The latter has no `Source_No` (so it cannot be
-joined to a customer at all) and none of the `_New` amount or kilogram fields. Customer names come from
+Use **`PBI_ValueEntries_New`**, never `PBI_ValueEntries`. The latter has no `Source_No` (so it cannot be
+joined to a customer at all) and none of the amount or kilogram fields. `PBI_ValueEntries_New` replaced
+`PBI_ValueEntriesPage`: same rows, but the sales amounts lost the `_New` field-name suffix
+(`Sales_Amount_Actual_New` → `Sales_Amount_Actual`) and it adds `Inventory_Posting_Group`, `Reason_Code`
+and `Cost_Posted_to_GL`. The entity and its 39-field `$select` are `VALUE_ENTRY_ENTITY` /
+`VALUE_ENTRY_SELECT`; only eleven of those fields feed the aggregation. Customer names come from
 `PBI_Customer`, joined `Source_No` → `Customer_No`; it returns one row per ledger entry, so collapse it
 to a `Customer_No` → `Customer_Name` map. `PBI_Item` supplies `Base_Unit_of_Measure`.
 
@@ -73,7 +77,7 @@ exact mirrors.
   `WIN_Total_Qty_in_Kg / 1000`. That field repeats on every row of the movement and only the originating
   entry carries a ledger quantity, so summing every row overstates volume ~12×. Verified: the
   qty-bearing rows map one-to-one onto distinct item ledger entries.
-- **Revenue and cost** sum **all** rows — `Sales_Amount_Actual_New + Sales_Amount_Expected_New` and
+- **Revenue and cost** sum **all** rows — `Sales_Amount_Actual + Sales_Amount_Expected` and
   `Cost_Amount_Actual + Cost_Amount_Expected`. The expected amount posts on the shipment and is reversed
   by the invoice, which carries the actual, so only the full set nets to the truth.
 - **Missing conversions.** `WIN_Conversion_to_Kg` is kg per base unit and is sometimes unset, which

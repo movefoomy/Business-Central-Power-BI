@@ -1,6 +1,6 @@
 """Refresh the BC Sales Margin dashboard from Business Central OData.
 
-Fetches PBI_ValueEntriesPage + PBI_Customer, applies the sales filters, aggregates to
+Fetches PBI_ValueEntries_New + PBI_Customer, applies the sales filters, aggregates to
 (customer, product group, posting date) grain and injects the payload into
 dashboard.template.html to produce dashboard.html.
 
@@ -32,6 +32,30 @@ EXCLUDED_SOURCE_NO = "ZZZZZ"
 
 # Item codes with this prefix are delivery charges: revenue but zero tonnage.
 EXCLUDED_ITEM_PREFIX = "YY"
+
+# The value-entry source. PBI_ValueEntries_New supersedes PBI_ValueEntriesPage: it carries
+# the same rows plus Inventory_Posting_Group, Reason_Code and Cost_Posted_to_GL, and it
+# publishes the sales amounts under their plain BC names rather than the _New suffix the
+# older page used. Still never PBI_ValueEntries, which has no Source_No at all.
+#
+# Eleven of these fields drive the aggregation; the rest are selected because this is the
+# specified field list for the endpoint. They cost a little bandwidth and nothing else --
+# everything not aggregated below is discarded. Do NOT add $top to narrow the result: BC
+# treats it as a hard cap and drops @odata.nextLink, truncating silently.
+VALUE_ENTRY_ENTITY = "PBI_ValueEntries_New"
+VALUE_ENTRY_SELECT = ",".join([
+    "Entry_No", "Item_No", "Posting_Date", "Item_Ledger_Entry_Type", "Source_No",
+    "Document_No", "Description", "Location_Code", "Inventory_Posting_Group",
+    "Item_Ledger_Entry_No", "Valued_Quantity", "Item_Ledger_Entry_Quantity",
+    "Invoiced_Quantity", "Cost_per_Unit", "Sales_Amount_Actual", "Salespers_Purch_Code",
+    "User_ID", "Source_Code", "Global_Dimension_1_Code", "Global_Dimension_2_Code",
+    "Cost_Amount_Actual", "Cost_Posted_to_GL", "Reason_Code", "Gen_Bus_Posting_Group",
+    "Gen_Prod_Posting_Group", "Document_Date", "External_Document_No", "Document_Type",
+    "Entry_Type", "Sales_Amount_Expected", "Cost_Amount_Expected",
+    "Shortcut_Dimension_3_Code", "Shortcut_Dimension_4_Code", "Shortcut_Dimension_5_Code",
+    "Shortcut_Dimension_6_Code", "Shortcut_Dimension_7_Code", "Shortcut_Dimension_8_Code",
+    "WIN_Total_Qty_in_Kg", "WIN_Conversion_to_Kg",
+])
 
 # WIN_Conversion_to_Kg is kilograms per base unit. Where BC has set it, it is used as is.
 # Where it is zero the base unit of measure still carries the answer, because the codes are
@@ -156,14 +180,8 @@ def build():
     ve_filter = "({0}) and Source_No ne '{1}' and Posting_Date ge {2}".format(
         doc_filter, EXCLUDED_SOURCE_NO, cfg["min_posting_date"]
     )
-    ve_select = (
-        "Source_No,Item_No,Document_No,Gen_Prod_Posting_Group,Posting_Date,"
-        "Item_Ledger_Entry_Quantity,WIN_Total_Qty_in_Kg,"
-        "Sales_Amount_Actual_New,Sales_Amount_Expected_New,"
-        "Cost_Amount_Actual,Cost_Amount_Expected"
-    )
     entries = fetch(
-        entity_url(cfg, "PBI_ValueEntriesPage", ve_select, ve_filter),
+        entity_url(cfg, VALUE_ENTRY_ENTITY, VALUE_ENTRY_SELECT, ve_filter),
         header, ctx, "value entries",
     )
     customer_rows = fetch(
@@ -235,7 +253,7 @@ def build():
                     kg = qty * per
                     rec["kg"] += -kg
             bucket[0] += kg
-        bucket[1] += num(row, "Sales_Amount_Actual_New") + num(row, "Sales_Amount_Expected_New")
+        bucket[1] += num(row, "Sales_Amount_Actual") + num(row, "Sales_Amount_Expected")
         bucket[2] += num(row, "Cost_Amount_Actual") + num(row, "Cost_Amount_Expected")
 
     # kg and cost are negative for outbound sales in BC, so negate to make them
