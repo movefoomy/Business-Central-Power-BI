@@ -1,7 +1,8 @@
 """Refresh the BC Sales Margin dashboard from Business Central OData.
 
-Fetches PBI_ValueEntries_New + PBI_Customer, applies the sales filters, aggregates to
-(customer, product group, posting date) grain and injects the payload into
+Fetches PBI_ValueEntries_New + PBI_Customer + PBI_SalesPersonCode, applies the sales
+filters, aggregates to (customer, product group, posting date, salesperson, sector) grain and
+injects the payload into
 dashboard.template.html to produce dashboard.html.
 
 Usage:  python refresh.py
@@ -56,6 +57,24 @@ VALUE_ENTRY_SELECT = ",".join([
     "Shortcut_Dimension_6_Code", "Shortcut_Dimension_7_Code", "Shortcut_Dimension_8_Code",
     "WIN_Total_Qty_in_Kg", "WIN_Conversion_to_Kg",
 ])
+
+# Salesperson names, joined Salespers_Purch_Code -> Code. Only Code and Name are used;
+# the rest are the specified field list for the endpoint. A value entry can carry no
+# salesperson at all, which is a real state and not an error -- those rows aggregate
+# under UNASSIGNED_SALESPERSON so the filter can still reach them and the totals with
+# no salesperson filter stay identical to the totals without this dimension.
+SALESPERSON_ENTITY = "PBI_SalesPersonCode"
+SALESPERSON_SELECT = ",".join([
+    "Code", "Name", "Global_Dimension_1_Code", "Global_Dimension_2_Code", "E_Mail",
+    "Phone_No", "No_of_Opportunities", "No_of_Interactions", "Job_Title",
+    "Search_E_Mail", "E_Mail_2",
+])
+UNASSIGNED_SALESPERSON = ""
+
+# Shortcut Dimension 3 is the business's sector analysis code. Like the salesperson it is
+# often unset, which is a real state rather than an error: those rows aggregate under the
+# empty string so a filter can still reach them and the unfiltered totals stay identical.
+UNASSIGNED_SECTOR = ""
 
 # WIN_Conversion_to_Kg is kilograms per base unit. Where BC has set it, it is used as is.
 # Where it is zero the base unit of measure still carries the answer, because the codes are
@@ -163,10 +182,15 @@ def previous_totals(path):
         return None
     if not rows:
         return None
+    # The measures sit at the end of the row, after however many dimensions the run that
+    # wrote the file used. Index from the right so a file written before the salesperson
+    # dimension existed still compares correctly, instead of summing a dimension string
+    # and either raising or reporting nonsense drift on the one run that spans the change.
+    kg, rev, cost = -3, -2, -1
     return {
-        "mt": sum(r[3] for r in rows) / 1000.0,
-        "revenue": sum(r[4] for r in rows),
-        "cogs": sum(r[5] for r in rows),
+        "mt": sum(r[kg] for r in rows) / 1000.0,
+        "revenue": sum(r[rev] for r in rows),
+        "cogs": sum(r[cost] for r in rows),
     }
 
 
@@ -193,6 +217,16 @@ def build():
         header, ctx, "items",
     )
     items = {i["No"]: i for i in item_rows if i.get("No")}
+
+    sp_rows = fetch(
+        entity_url(cfg, SALESPERSON_ENTITY, SALESPERSON_SELECT),
+        header, ctx, "salespeople",
+    )
+    sp_names = {}
+    for row in sp_rows:
+        code = (row.get("Code") or "").strip()
+        if code and code not in sp_names:
+            sp_names[code] = (row.get("Name") or code).strip() or code
 
     # PBI_Customer returns one row per ledger entry, so collapse to a No -> Name map.
     names = {}
@@ -231,6 +265,8 @@ def build():
             row.get("Source_No") or "",
             row.get("Gen_Prod_Posting_Group") or "(none)",
             row.get("Posting_Date") or "",
+            (row.get("Salespers_Purch_Code") or UNASSIGNED_SALESPERSON).strip(),
+            (row.get("Shortcut_Dimension_3_Code") or UNASSIGNED_SECTOR).strip(),
         )
         bucket = agg[key]
         qty = num(row, "Item_Ledger_Entry_Quantity")
@@ -261,8 +297,8 @@ def build():
     # opposite sign and must SUBTRACT from the bucket. Taking abs() per bucket would
     # turn those reversals into additions and overstate volume and cost.
     rows = [
-        [no, group, date, round(-kg, 2), round(rev, 2), round(-cost, 2)]
-        for (no, group, date), (kg, rev, cost) in sorted(agg.items())
+        [no, group, date, sp, sector, round(-kg, 2), round(rev, 2), round(-cost, 2)]
+        for (no, group, date, sp, sector), (kg, rev, cost) in sorted(agg.items())
     ]
     print("  {0} aggregate rows".format(len(rows)))
 
@@ -301,6 +337,8 @@ def build():
                 e["item"], e["desc"][:38], e["uom"], e["units"]))
 
     dates = [r[2] for r in rows if r[2]]
+    sp_used = sorted({r[3] for r in rows})
+    sectors_used = sorted({r[4] for r in rows})
     data = {
         "generated": datetime.datetime.now().strftime("%d %b %Y, %H:%M"),
         # Offset-aware, so the page can age it correctly from any timezone.
@@ -311,12 +349,18 @@ def build():
         "groups": sorted({r[1] for r in rows}),
         "mtNotes": mt_notes,
         "customers": {no: names.get(no, no) for no in used},
+        "salespeople": {c: sp_names.get(c, c) for c in sp_used if c},
+        # Shortcut Dimension 3, shown as "Sector". No name table for it in BC, so the code
+        # is the label; the empty code is dropped here and handled as its own option page-side.
+        "sectors": [c for c in sectors_used if c],
         "rows": rows,
     }
 
-    total_mt = sum(r[3] for r in rows) / 1000.0
-    total_rev = sum(r[4] for r in rows)
-    total_cogs = sum(r[5] for r in rows)
+    # Measures sit at the end of the row; index from the right so adding a dimension
+    # cannot silently shift them (see previous_totals for the same reasoning).
+    total_mt = sum(r[-3] for r in rows) / 1000.0
+    total_rev = sum(r[-2] for r in rows)
+    total_cogs = sum(r[-1] for r in rows)
     print("")
     print("Totals over the full range ({0} -> {1}):".format(data["minDate"], data["maxDate"]))
     print("  Total MT       {0:>16,.2f}".format(total_mt))

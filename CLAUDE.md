@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A single dashboard, "Sales Margin Control", over Business Central sales value entries for
+Four tabs, "Sales Margin Control", over Business Central sales value entries for
 **CI Manufacturing Pte. Ltd**. Four KPI tiles, two product-mix bar charts, and a monthly grid of customers
-showing MT, revenue, cost of sales, gross profit and GP % for every month. Published as an Artifact:
+showing MT, revenue, cost of sales, gross profit, GP % and price per MT for every month. Published as an Artifact:
 <https://claude.ai/code/artifact/e9a57277-d2fd-41aa-8ecb-7e077b5aeab1>
 
 No package manager, no build tool, no test framework. `refresh.py` is standard-library Python;
@@ -42,17 +42,31 @@ BC OData ──refresh.py──> data.json ──┐
 
 Data is embedded rather than fetched live because the browser cannot reach BC: self-signed cert, no CORS
 headers, and Basic auth credentials must never ship to a client. The page carries only the aggregate —
-about 2,500 rows at **(customer × product group × posting date)** grain, ~130 KB — enough for every
+about 2,600 rows at **(customer × product group × posting date × salesperson)** grain, ~150 KB — enough for every
 filter combination to recompute instantly client-side. Keep it that way; do not add a live fetch.
 
-Payload keys: `rows` (`[customer_no, group, date, kg, revenue, cost]`, all display-positive), `customers`
-(no → name), `groups`, `minDate`/`maxDate`, `generated` (display string) and `generatedISO`
-(offset-aware, for ageing), and `mtNotes` (see below). Months are derived client-side from the daily
-dates, so changing the time grain needs no refresh.
+Payload keys: `rows` (`[customer_no, group, date, salesperson_code, sector, kg, revenue, cost]`, all
+display-positive), `customers` (no → name), `salespeople` (code → name), `sectors` (Shortcut Dimension 3
+codes, see below), `groups`, `minDate`/`maxDate`,
+`generated` (display string) and `generatedISO` (offset-aware, for ageing), and `mtNotes` (see below).
+Months are derived client-side from the daily dates, so changing the time grain needs no refresh.
+
+**The measures sit at the end of the row, not at a fixed index.** Adding a dimension shifts them, and
+`previous_totals()` in `refresh.py` reads the *previous* run's `data.json` — a file that may predate the
+change. It indexes from the right (`-3, -2, -1`) for exactly that reason. Anything else new that reads a
+persisted row must do the same, or the one run that spans a shape change either raises or reports
+nonsense drift.
 
 Credentials live in `config.json` (gitignored). Never inline them into the template.
 
 ## Source data — non-obvious
+
+A fourth entity, **`PBI_SalesPersonCode`**, supplies salesperson names, joined
+`Salespers_Purch_Code` → `Code`. Only `Code` and `Name` are read from it. **A value entry can carry no
+salesperson at all** — currently 60 aggregate rows and about a quarter of revenue — so those rows
+aggregate under the empty code and get their own "No salesperson" option in the picker. Dropping them
+from the list would make a quarter of the business unreachable by that filter while still counting it in
+every total.
 
 Use **`PBI_ValueEntries_New`**, never `PBI_ValueEntries`. The latter has no `Source_No` (so it cannot be
 joined to a customer at all) and none of the amount or kilogram fields. `PBI_ValueEntries_New` replaced
@@ -108,7 +122,8 @@ The refresh is unattended, so `refresh.py` guards its own output. Do not weaken 
 constant was tried and began warning on every run within a day of BC posting new data; a test asserting
 fixed totals rotted the same way. BC changes hourly. Assert invariants instead: months sum to the Total
 column, the grid sums to the KPI tiles, bar values sum to their tile, GP = revenue − COGS per cell,
-GP % derived never summed, filters only ever narrow, empty ranges yield zeroes not NaN.
+GP % and price per MT derived never summed, filters only ever narrow, empty ranges yield zeroes not
+NaN.
 
 To test the page rather than the pipeline, slice `compute()` out of `dashboard.html` and run it in Node
 against the embedded blob — that exercises shipped code instead of a re-implementation. Two traps when
@@ -139,9 +154,175 @@ Seven product groups map to seven fixed palette slots (`--s1`…`--s7`) from `DA
 follows the product group, never its rank** — a filter that drops a group must not repaint the survivors,
 and both charts must share the mapping. Rows are drawn in fixed group order, not by value, so
 neighbours are always adjacent palette slots — the pairing the palette was validated on. If you change
-these hues, re-run the dataviz skill's `validate_palette.js` in light and dark.
+these hues, re-run the dataviz skill's `validate_palette.js` in light and dark. The product-group
+picker makes that repaint rule directly reachable by a user, so it is asserted in the harness rather
+than only written down: `classOf` is built once from the full `DATA.groups` and never from the filtered
+list. The picker shows each group's palette swatch, which is only honest while that holds.
 
-**The monthly grid.** `SUBS` defines the five measure columns repeated under each month band. Sort keys
+**Three filter dropdowns share one implementation** — customer, salesperson and product group. They
+share the panel markup, `fillOpts`, and a single `PANELS` registry that owns open/close, so opening one
+closes the others and a click inside any of them is never mistaken for a click outside. Add a fourth by
+adding a row to `PANELS` and a `render*Opts`, not by copying the wiring.
+
+`optionTotals(dim)` computes the revenue shown beside each option under **every filter except the one
+being drawn** — `dim` is the row index (0 customer, 1 group, 3 salesperson). A picker included in its
+own totals would show zero against every unticked option, which is the opposite of the number a person
+opening that list wants. `fillOpts` mutates the Set it is handed rather than replacing it, so
+**never reassign `state.picked` / `state.sp` / `state.grp`** — Select all must add in a loop, or every
+checkbox listener is orphaned against a dead Set.
+
+**Each tab explains only its own figures.** There are three `<footer>` elements: one inside each panel
+carrying that tab's "how this is calculated" definitions and notes, and a third, `#notes-footer`, outside
+both for the tonnage-conversion flag — that one is a caveat about MT itself, so it belongs to both tabs.
+It starts `hidden` and `renderMtNotes` un-hides it along with `#mt-notes`; un-hide only the inner div and
+an empty card is drawn under every tab. **A measure added to one tab must be described in that tab's
+footer and no other** — the single shared footer used to tell trend-tab readers about sorting columns and
+two bar charts that are not on their screen.
+
+**The trend tabs are one implementation, instantiated per measure.** `createTrend(cfg)` builds a tab
+from a config naming its id prefix (`cfg.p`), which column of a row it reads (`cfg.value`) and how a
+figure is written (`cfg.full`, `cfg.tick`, `cfg.axis`, `cfg.noun`, `cfg.totalCol`). `TRENDS` holds the
+instances — `mt` reads `r[4] / 1000`, `rev` reads `r[5]`. Everything else is shared: the grain
+machinery, the plot, the crosshair, the legend, the table twin, the slicers, the grain-comparison
+footer.
+
+Each instance carries date range, grain, product groups **and customers** in its own `st`. The customer
+picker is the searchable panel, not chips — 98 customers is far past what a chip row can hold — and it
+registers itself into the one `PANELS` registry via the `panel` descriptor the factory returns, so a
+click outside any dropdown on any tab behaves identically. Its option list shows each customer's figure
+under the tab's *other* filters but not its own, for the same reason the margin tab's pickers do.
+
+**A third measure is a `TRENDS` entry plus a markup panel — never a copy of the block.** The panels are
+duplicated in the template because their ids must differ, but they are generated from one string in the
+build script for the same reason. Each instance owns its own `st` (date range, grain, groups), so the
+tabs do not disturb one another; that independence is asserted.
+
+**Shortcut Dimension 3 is shown as "Sector" and is EMPTY in BC.** Not the field name, not the query —
+the dimension itself is unset on every value entry: `Dimension_Set_ID` is `0` there, and Global
+Dimension 1 and 2 and Shortcut Dimensions 3–8 all come back `''`. Probed directly against the endpoint.
+The plumbing is in place through the grain and the payload, and the Revenue tab's Sector dropdown hides
+itself below two options, so it will appear on its own the day the dimension is populated. **Do not
+"fix" it page-side.** If it must work sooner, the fix is in Business Central.
+
+**Extra per-measure dimensions are declared, not hand-built.** `cfg.dims` takes
+`{key, idx, label, icon, all, options, name}` and the factory gives each one a Set on `st`, a dropdown,
+a registry entry, a pill and a line in reset. Revenue declares salesperson (`idx: 3`) and sector
+(`idx: 4`); the other tabs declare none. A dimension never filters its own option list.
+
+`cfg.value` is the only place a measure's column appears. Row shape is
+`[customer, group, date, salesperson, kg, revenue, cost]`, tonnage in **kilograms**, revenue already
+display-positive. Gross profit is **derived, not stored** — `r[5] - r[6]` — and reconciles to revenue
+minus cost of sales, which is asserted.
+
+**All three trend panels are generated from one string** in the build script. They were diverging by
+copy-paste before the third arrived. A change to the slicer band must land on every tab, so edit the
+template, not a panel.
+
+**Coarser grain does not steady every measure.** It does for tonnage and revenue, which is why month is
+the default. Gross profit nets gains against losses inside a bucket, so monthly currently reads spikier
+than weekly. The claim that survives all three, and the one the default rests on, is that **daily is the
+spikiest** — that is what the harness asserts; the order-of-magnitude claim is asserted only where it
+holds.
+
+**Both measures go negative.** A credit memo subtracts, so tonnage and revenue each dip below zero —
+tonnage on a return day, revenue where PROJECT posted about −S$26k in one month. The y scale opens
+downwards for both; do not clamp either.
+
+**The filter band is one 12-column grid.** Every field spans a whole number of columns and the two
+rows each total exactly twelve — `date 3 + quick 4 + grain 3 + view 2`, then
+`customer 3 + groups 7 + reset 2`. **Keep them summing to 12**, or the band goes ragged. Labels sit on
+one line and controls on the line below, which is what makes it read as aligned; every `.ctl` carries
+`min-height: 34px` so the rows stay level whatever they hold.
+
+Chip rows are grids of their own: `.presets.even` gives equal-width columns (quick range, grain, view)
+and `.presets.fill` an `auto-fit` track (product groups), so a chip row **reaches the edge of its cell**
+instead of trailing off. That trailing edge was what made an earlier version look unaligned. An attempt
+at three bordered `.sgroup` sections was worse — blocks of differing height with labels floating at
+whatever height their control happened to be — and was removed.
+
+**Icons come from one `<svg class="sprite">` of `<symbol>`s at the top of the wrap**, referenced by
+`<use href="#ic-…">` in markup and by `icon12()` from script. Build them through `createElementNS`, not
+`innerHTML`: an HTML-parsed `<use>` is an inert element that renders nothing. Marks take colour from
+CSS via `currentColor` — the same rule that keeps `var()` out of `fill`/`stroke`.
+
+**Colour on this band means state, never decoration.** An `.active` pill lights up only when its
+dimension is *narrowing* the view, and Reset gains `.armed` only when there is something to reset —
+grain excluded, since a grain is a way of looking rather than a filter. Whole-range, all-groups and
+no-customer are defaults and stay unlit, so anything highlighted is a deliberate restriction. `sync()`
+redraws the strip; add a filter and it needs a pill, or the strip starts lying.
+
+**The seven series hues are deliberately not used here.** Colour follows the product group everywhere
+on this page; borrowing those hues for chrome would break that reading. Chrome uses accent, ink and the
+warning tone only.
+
+**The trend tabs.** A line chart over time, one line per product group, with its own date range, grain
+and group selection in `st` — deliberately independent of the margin tab's filters, since they answer
+"what did we ship or bill, when", not "what did that customer pay". Notes that are load-bearing:
+
+- **Grain is the difference between a trend and a heart monitor, and `month` is the default for that
+  reason.** Shipments arrive in lumps, so per posting date the busiest period runs well over a hundred
+  times the median and the line is a row of spikes against a flat floor. Weekly is still around ten
+  times — the bulk cargoes themselves land about monthly — and monthly is close to even. `GRAINS` maps a
+  date to a bucket key and a key back to the span it covers. Nothing is smoothed: every grain totals to
+  identical tonnage, which is asserted. **Do not change the default to `day` without re-reading this**;
+  the first cut shipped daily and the chart was unreadable.
+- **`renderGrainStats` computes that comparison live**, into the footer table, from the current
+  selection — the standing no-frozen-values rule applies to prose in the page as much as to
+  `CONTROL_TOTALS`. The figures above drifted within a day of being written down, which is why the page
+  computes its own. It swaps `tstate.grain` to sample each grain and **must restore it**; the harness
+  asserts that, and that its row for the selected grain agrees with the plot.
+- **The tab explains itself in two parts**, and they must not blur: the first footer describes the
+  chart, the second describes the bucketing. A note about the table view or the grains does not belong
+  in the first. That second footer is written for a **business reader, not a maintainer** — no buckets,
+  keys, ISO weeks or ratios in the prose. Keep it that way; the terms of art belong here.
+- **`partial` only detects a trailing period the DATA has not filled** (`G.end(last) > DATA.maxDate`).
+  It does **not** detect a period cut short by `tstate.from`/`tstate.to`. With a custom range the first
+  and last points can each hold part of a period and are drawn as ordinary points: from 2026-07-01 the
+  first week is keyed 2026-06-29 but holds only 1–5 July, and 30 June carries a ~19,800 MT cargo, so the
+  point moves by an order of magnitude if the range starts two days earlier. Documented in the tab's
+  footer as a caveat for now; the fix is a per-point clipped test against both the filter and the data
+  bounds, drawn hollow like the trailing case.
+- **The footer's worked example is a fixed illustration, by request.** It is written as a hypothetical
+  — "you set the range to 1–31 July" — rather than as a statement about the data, and it names no year
+  and asserts no weekday, so it does not go stale. It was briefly generated from the live selection
+  instead; that was reverted. If it is ever reinstated, remember that a weekday in prose is a frozen
+  value like any other: 29 June is a Monday in 2026 and a Tuesday in 2027, so any example that carries
+  a real date has to be derived rather than typed.
+- **A trailing bucket the data has not filled is flagged, not hidden.** `partial` is set when the last
+  period's `end` runs past `DATA.maxDate`; that point is drawn hollow and labelled in the hint and the
+  table. Without it, three days of September plot as a collapse after a full August.
+
+- **The y scale must open downwards.** Daily tonnage goes negative when a credit memo lands; HCL posts
+  −54.92 MT on 2026-07-31. Anchoring the scale at zero put that point below the plot box, where
+  `overflow: visible` drew it across the date labels. `yMin` is `-niceMax(-min)` when any point is
+  negative, and the baseline is drawn at `y(0)`, not at the bottom edge.
+- **The scale follows the selected groups**, which is the whole point of the slicer: NAOH is three
+  quarters of all tonnage, so with it shown the other six are flat lines. Deselecting it rescales them.
+- A day a group did not ship is a real **0**, not a gap, so two groups can be read against each other
+  on the same day.
+- Colour comes from the same `classOf` map as the bars. A group is one colour on both tabs, and
+  deselecting one never repaints the others.
+- **The slicer lives inside the tile.** The dataviz skill calls per-chart filters an anti-pattern, its
+  rule being one filter row above everything it scopes. That tab holds exactly one chart plus its table
+  twin, so the band at the top of the tile *is* that row. Do not add a second chart to that tab without
+  moving the slicer out.
+- **The table view is not optional.** Three of the seven hues fall under 3:1 against the light card, and
+  the palette validator's contrast WARN obligates visible labels or a table view. It is also the
+  accessibility pass's table twin. Removing it breaks both.
+- `renderTrend` clears the SVG but **keeps `<title>`/`<desc>`** — `aria-labelledby` points at them, the
+  same trap the bars hit.
+
+**The monthly grid.** `SUBS` defines the six measure columns repeated under each month band. Adding a
+seventh is a `SUBS` entry plus a key on `measures()`; the header, footer, colspans and sort keys all
+follow from it. The one place that does **not** follow is the grand-total object in `renderTable`, which
+is built by hand — a derived measure added to `SUBS` and forgotten there renders `undefined` in the
+bottom-right corner only.
+
+**Two of the six are rates, not sums: `gpm` and `ppmt`.** Both are recomputed from the revenue and
+tonnage of the cell they sit in, at every level — cell, row total, month footer, grand total. Summing
+them is always wrong and rarely looks wrong: the per-customer price-per-MT column currently adds to
+about 61,600 against a true blended 271.52. Both guard their divisor, because a month can carry revenue
+with no tonnage and must read 0, not `Infinity`. Sort keys
 are `name`, `total:<measure>` or `m:YYYY-MM:<measure>`; an absent month must yield `undefined`, not 0, so
 non-trading customers sort below traders rather than among zeros. Month cells abbreviate money
 (`compact()`); the Total band and the hover card carry full 2-decimal precision.

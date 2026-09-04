@@ -19,12 +19,26 @@ together.
   the selection ("All customers", the name when one is picked, otherwise a count). It stays open while
   you tick, so several customers can be chosen in one go; close it with the Customer button again, a
   click anywhere outside it, or Escape.
-- **Reset filters** returns everything to the full range and all customers.
+- A **salesperson picker** — the same multi-select dropdown, listing the codes present in the data
+  with revenue beside each. Entries that carry no salesperson code appear as **No salesperson**; they
+  are about a quarter of revenue, so the filter can reach them rather than pretending they do not
+  exist. The picker hides itself if the data has fewer than two salespeople to choose between.
+- A **product group picker** — the same dropdown over `Gen. Prod. Posting Group`, each option
+  carrying the palette swatch used for that group's bar, listed in the fixed group order the charts
+  use. Filtering here narrows the KPI tiles, the grid and both charts together; the groups that remain
+  keep their own colours rather than being repainted by rank.
+- Each picker shows revenue per option computed under the *other* pickers' selections, so the figure
+  beside a name says what ticking it would actually contribute.
+- **Reset filters** returns everything to the full range, all customers, all salespeople and all
+  product groups.
 
 **Four KPI tiles** — total volume, revenue, cost of sales and gross profit for the current selection.
 
+The page has four tabs: **Sales margin** (everything below), **MT trend**, **Revenue trend** and
+**Gross profit trend**.
+
 **Customer performance by month** — the main grid. Months run left to right and every month band
-shows all five measures side by side:
+shows all six measures side by side:
 
 | Column | Meaning |
 | --- | --- |
@@ -33,6 +47,7 @@ shows all five measures side by side:
 | `COGS` | Cost of sales |
 | `GP` | Gross profit |
 | `GP %` | Gross profit ÷ revenue, worked out from that month's own figures — never averaged across months |
+| `S$/MT` | Price per MT — revenue ÷ tonnage, the average realised selling price. Worked out from that month's own figures, never averaged across months; a month with revenue but no tonnage reads 0.00 |
 
 A period **Total** band sits on the right. Every column sorts. A dash means no trade that month, and
 non-trading customers sort below traders rather than among the zeros. Month cells are abbreviated to
@@ -46,12 +61,124 @@ the page past every customer row. The header rows and the customer-name column s
 posting group. They share **one scale and one row order**, so a product's revenue bar reads straight
 across against its cost bar: wherever the lower bar is the longer one, that product sold below cost.
 
+### The trend tabs
+
+Three line charts over time, one line per general product posting group — **MT trend** plots tonnage
+shipped, **Revenue trend** plots revenue, and **Gross profit trend** plots revenue less cost of sales,
+both in Singapore dollars. They are the same chart driven by different measures, so everything below
+applies to all three, and each keeps its own filters: changing the grain, groups or customers on one
+leaves the others alone.
+
+**Gross profit spends real time below the zero line**, and that is the point of the tab: a line under
+the baseline means those goods sold for less than they cost. Three of the seven product groups are
+negative over the period. The zero line is drawn across every plot so a loss-making stretch is visible
+rather than inferred.
+
+Each has its own slicer band inside the tile: **Posting date**, **Quick range**, **Grain**, **View** on
+one row, then **Customer**, **Product group** and **Reset filters** on the next. Every field is aligned
+to a shared twelve-column grid, so the labels line up across the band and the controls line up beneath
+them, and the chip rows stretch to fill their cells rather than stopping short. Each label carries its
+own icon.
+
+Underneath sits a **Showing** strip: one pill per dimension — dates, grain, product groups, customers —
+**highlighted only when that dimension is actually narrowing the view**. All dates, all groups and all
+customers stay unlit, so anything picked out in colour is a restriction you applied. Reset stays quiet
+until there is something to reset, then turns amber. **Every filter here is per-tab**: narrowing to a customer on
+Revenue trend leaves MT trend, Gross profit trend and the margin tab exactly as they were.
+
+- **Posting date** from / to, plus the same quick ranges.
+- **Grain** — Day, Week or Month. **Month is the default, and that is the setting that makes this a
+  trend rather than a heart monitor.** See below.
+- **Product group** — a row of chips, each carrying that group's colour. Click to add or drop a line.
+- **Customer** — the same searchable multi-select picker as the margin tab, showing each customer's
+  figure for that measure beside the name. Empty means all customers.
+- **Salesperson** and **Sector** — Revenue trend only. Salesperson lists each code with its revenue
+  beside it, including a **No salesperson** entry for the quarter of revenue that carries no code.
+  Sector is Business Central's Shortcut Dimension 3; see the note below.
+- **Chart / Table** — the table view lists the same figures as text, period by period, with per-group
+  and per-period totals.
+
+#### Day, Week and Month
+
+All three settings show the same deliveries. The only thing that changes is **how many days are added
+together before a point is drawn**. The total tonnage is identical whichever you pick — nothing is
+averaged, estimated or smoothed away.
+
+| Setting | What one point is | Drawn on |
+| --- | --- | --- |
+| **Day** | The tonnage posted on that date | The date itself |
+| **Week** | Every day of a **Monday-to-Sunday week**, added together | The Monday |
+| **Month** | Every day of a **calendar month**, added together | The 1st |
+
+Use **Month** for the overall direction, **Week** when a month is too coarse to show movement inside it,
+and **Day** when you have spotted a jump and want to find the individual shipment behind it.
+
+Month is the default because deliveries arrive in lumps — a bulk cargo one day, drums the next — so at
+day level the line jumps too sharply to read as a direction of travel. The tab carries a live comparison
+of the three settings for whatever you have selected, including a busiest-over-typical figure and the
+three identical totals.
+
+**Weeks do not add up to months.** A week can begin in one month and end in the next — the week
+beginning 29 June runs through to 5 July — so its tonnage belongs partly to June and partly to July.
+Each adds up correctly on its own; only days divide cleanly into both.
+
+#### Part weeks and part months at the ends of a date range
+
+A week or month is shown in full only if the date range covers all of it. At either end it can be cut
+short, and a cut-short point sits lower than a full one **because it holds fewer days, not because less
+was shipped**.
+
+**A common example.** You set the range to **1–31 July** and read by week. July neither begins on a
+Monday nor ends on a Sunday, so both ends land mid-week:
+
+- The first point is the week commencing **29 June**, but it holds only **1–5 July**. 29 and 30 June are
+  excluded by the *from* date.
+- The last point is the week commencing **27 July**, but it holds only **27–31 July**. 1 and 2 August
+  are excluded by the *to* date.
+
+Both hold five days rather than seven, so both sit lower than a full week — and if a large shipment fell
+on one of the excluded days, that point understates the week badly. The same happens by month whenever a
+range starts or ends part-way through one.
+
+To compare periods fairly, start on a Monday and end on a Sunday when reading by week, and use whole
+months when reading by month. The figures are always right for the days in range — it is the comparison
+between points that a cut-short period distorts.
+
+> **Known gap.** The chart flags a trailing period the *data* has not filled (drawn hollow), but it does
+> not yet flag a period cut short by the *date filter*. Until it does, the two edge points of a custom
+> range need reading with the above in mind.
+
+> **Sector is empty in Business Central.** Shortcut Dimension 3 is unset on every value entry — as are
+> Global Dimension 1 and 2 and Shortcut Dimensions 4–8, and `Dimension Set ID` is `0` throughout. The
+> dashboard reads and carries the field, and the Sector dropdown on Revenue trend hides itself while
+> there is nothing to choose between, so it will appear by itself once the dimension is populated in BC.
+> Nothing needs changing here when that happens.
+
+Three more things are deliberate and easy to undo by accident:
+
+- **The y scale follows the groups you have selected.** NAOH is roughly three quarters of tonnage and
+  seventy per cent of revenue, so with it shown the other six lines sit almost flat on either tab.
+  Untick it and the rest rescale into something readable — that is what the slicer is for.
+- **The scale opens below zero when it needs to.** Both measures can go negative: a return or credit
+  memo subtracts. Tonnage dips below zero on a return day, and revenue does where a group posts a net
+  credit for a month. Those periods are shown, not clipped. (At a monthly grain they net off inside
+  their bucket, which is correct — the month really did settle at that figure.)
+- **A part period is drawn hollow**, and called out in the hint line and in the table. Three days of
+  September after a full August would otherwise plot as a collapse rather than as a month that has
+  barely started.
+
+Colour matches the bar charts on the other tab, so a group is the same colour throughout, and hiding a
+group never repaints the rest. Hovering the plot gives a crosshair and every group's tonnage for the
+nearest period.
+
 **A last-refreshed stamp** (top right) shows the build time and a live relative age that re-ticks on
 its own. Past 90 minutes it turns amber — the task runs hourly, so a stopped refresh would otherwise
 look identical to a healthy one. Underneath it, the posting date range actually present in the data.
 
-**A footer** explaining each measure in business terms, and any tonnage conversion notes from the last
-run (see *Missing conversions* below).
+**A footer on each tab** explaining that tab's own figures in business terms. Sales margin covers its six
+grid measures and the bar charts. MT trend is split in two: *How the trend is calculated* describes the
+chart, and *How Day, Week and Month are calculated* sets out the bucketing in full at the bottom. Any tonnage conversion notes
+from the last run appear in a separate panel below both (see *Missing conversions*).
 
 ## Refreshing
 
@@ -119,7 +246,7 @@ One environment variable: **`CHECK_TOTALS=0`** skips the sanity gate and the dri
 
 ## Source data
 
-Three OData collections are read, all under the same service root. `refresh.py` builds each request as:
+Four OData collections are read, all under the same service root. `refresh.py` builds each request as:
 
 ```
 {base_url}/Company('{company}')/{entity}?$select=...&$filter=...
@@ -130,6 +257,7 @@ Three OData collections are read, all under the same service root. `refresh.py` 
 | `PBI_ValueEntries_New` | 39 fields — see `VALUE_ENTRY_SELECT` in `refresh.py`. Eleven drive the figures: `Source_No, Item_No, Document_No, Gen_Prod_Posting_Group, Posting_Date, Item_Ledger_Entry_Quantity, WIN_Total_Qty_in_Kg, Sales_Amount_Actual, Sales_Amount_Expected, Cost_Amount_Actual, Cost_Amount_Expected`. | Every figure on the dashboard. |
 | `PBI_Customer` | `Customer_No, Customer_Name` | Customer names, joined `Source_No` → `Customer_No`. Returns one row per ledger entry, so it is collapsed to a no → name map. |
 | `PBI_Item` | `No, Description, Base_Unit_of_Measure` | The base UOM behind the tonnage fallback, and item descriptions for the conversion notes. |
+| `PBI_SalesPersonCode` | 11 fields — see `SALESPERSON_SELECT` in `refresh.py`. Only `Code` and `Name` are used. | Salesperson names, joined `Salespers_Purch_Code` → `Code`, behind the salesperson filter. |
 
 Use `PBI_ValueEntries_New` — **not** `PBI_ValueEntries`, which exposes neither `Source_No` (so it
 cannot be linked to a customer) nor the amount and kilogram fields. It replaced
@@ -234,6 +362,7 @@ positive.
 
 The browser cannot call BC directly: the host serves a self-signed certificate, sends no CORS headers,
 and Basic auth credentials must never ship to a client. So `refresh.py` holds the credentials and the
-page holds only the aggregate — about 2,500 rows at (customer × product group × posting date) grain,
-roughly 130 KB, which is enough for every filter combination to recompute instantly in the browser.
+page holds only the aggregate — about 2,600 rows at (customer × product group × posting date ×
+salesperson) grain, roughly 150 KB, which is enough for every filter combination to recompute instantly
+in the browser.
 Months are derived in the browser from the daily dates, so changing the time grain needs no refresh.

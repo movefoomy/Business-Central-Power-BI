@@ -173,6 +173,7 @@ input[type="date"] { font-size: 13px; }
   background: var(--surface); border: 1px solid var(--hairline);
   border-radius: 10px; box-shadow: 0 8px 30px rgba(0,0,0,.16);
 }
+.panel.narrow { width: 268px; }
 .panel-head { padding: 10px; border-bottom: 1px solid var(--hairline-2); display: flex; flex-direction: column; gap: 8px; }
 .search-input { width: 100%; font-size: 13px; }
 .panel-acts { display: flex; gap: 8px; }
@@ -209,6 +210,16 @@ input[type="date"] { font-size: 13px; }
 .kpi.gp .v.pos { color: var(--pos); }
 .kpi.gp .v.neg { color: var(--neg); }
 
+/* ---------- tabs ---------- */
+.tabs { display: flex; gap: 4px; margin: 0 0 14px; border-bottom: 1px solid var(--hairline); }
+.tab {
+  font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+  color: var(--ink-2); background: none; border: 0;
+  border-bottom: 2px solid transparent; padding: 9px 14px; margin-bottom: -1px;
+}
+.tab:hover { color: var(--ink); }
+.tab[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+
 /* ---------- cards ---------- */
 .card {
   background: var(--surface); border: 1px solid var(--hairline);
@@ -233,6 +244,156 @@ input[type="date"] { font-size: 13px; }
 .c1 { --c: var(--s1); } .c2 { --c: var(--s2); } .c3 { --c: var(--s3); }
 .c4 { --c: var(--s4); } .c5 { --c: var(--s5); } .c6 { --c: var(--s6); }
 .c7 { --c: var(--s7); }
+
+/* The icon sprite. Hidden root, symbols still resolve through <use>. Marks take their
+   colour from CSS (currentColor), never a presentation attribute -- the same rule that
+   keeps var() out of fill/stroke. */
+.sprite { display: none; }
+.ic { width: 13px; height: 13px; flex: none; fill: none;
+  stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+
+/* The trend tile's own slicer band, scoped to the tab and sitting inside the card it
+   filters.
+
+   ONE 12-column grid, not sections. Every label sits on a common line and every control on
+   the line below it, which is what makes the band read as aligned rather than assembled.
+   Two rows of twelve: date 3 + quick 4 + grain 3 + view 2, then customer 3 + groups 7 +
+   reset 2. The chip rows are grids of their own so their buttons are equal width and reach
+   the edge of their cell -- a row of chips that stops short is what made this look ragged.
+
+   Each label carries its own icon in the accent colour. That is what makes the band
+   noticeable, and it costs no vertical space, unlike the section headings it replaces. */
+.slicers {
+  display: grid; grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 13px 16px; padding: 14px 20px;
+  border-bottom: 1px solid var(--hairline-2); background: var(--surface-2);
+}
+.slicers .field { min-width: 0; gap: 0; }
+.slicers .field > label {
+  display: flex; align-items: center; gap: 6px; height: 15px; margin-bottom: 8px;
+  font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--ink-3); white-space: nowrap;
+}
+.slicers .field > label .ic { color: var(--accent); }
+/* Every control is the same height, so the two rows line up whatever they contain. */
+.ctl { display: flex; align-items: center; gap: 7px; min-height: 34px; }
+.ctl.dates input[type="date"] { flex: 1 1 0; min-width: 0; }
+.presets.even { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; width: 100%; }
+.presets.fill { display: grid; grid-template-columns: repeat(auto-fit, minmax(78px, 1fr)); gap: 6px; width: 100%; }
+.slicers .chip {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  width: 100%; padding: 7px 9px; text-align: center;
+}
+.slicers .picker-btn { width: 100%; min-width: 0; }
+.slicers .picker-btn .caret { margin-left: auto; }
+
+.f-date { grid-column: span 3; }
+.f-quick { grid-column: span 4; }
+.f-grain { grid-column: span 3; }
+.f-view { grid-column: span 2; }
+.f-cust { grid-column: span 3; }
+.f-groups { grid-column: span 7; }
+.f-reset { grid-column: span 2; }
+
+/* The Revenue band carries two dimensions the others do not, so it runs to three rows:
+   date 3 + quick 4 + grain 3 + view 2, then customer 3 + salesperson 3 + sector 3 +
+   reset 3, then product group across all twelve. Keep each row summing to 12. */
+#panel-rev .f-cust, .f-sp, .f-sector { grid-column: span 3; }
+#panel-rev .f-reset { grid-column: span 3; }
+#panel-rev .f-groups { grid-column: span 12; }
+
+@media (max-width: 1080px) {
+  .f-date, .f-quick, .f-grain, .f-cust, .f-sp, .f-sector { grid-column: span 6; }
+  #panel-rev .f-cust, #panel-rev .f-reset { grid-column: span 6; }
+  .f-groups { grid-column: span 12; }
+  .f-view, .f-reset { grid-column: span 6; }
+}
+@media (max-width: 620px) {
+  .slicers > .field { grid-column: span 12 !important; }
+}
+
+/* Reset is quiet until there is something to reset, then it arms itself in the warning
+   tone -- the one place on this band where a colour says "you have narrowed the view". */
+.reset-chip { border-style: dashed; }
+.reset-chip:hover { border-style: solid; }
+.reset-chip.armed {
+  border-style: solid; border-color: var(--warn); color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 11%, transparent);
+}
+
+
+/* What is actually applied. A pill lights up only when its dimension narrows the view, so
+   the question "what am I looking at" is answered without reading the controls back. */
+.active {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 7px 9px;
+  padding: 10px 20px; border-bottom: 1px solid var(--hairline-2); font-size: 12px;
+  background: color-mix(in srgb, var(--accent) 3%, var(--surface));
+}
+.active .lead {
+  display: inline-flex; align-items: center; gap: 6px;
+  color: var(--ink-3); font-weight: 700; font-size: 10px;
+  letter-spacing: .11em; text-transform: uppercase;
+}
+.active .pill {
+  display: inline-flex; align-items: center; gap: 6px; padding: 3px 11px 3px 8px;
+  border-radius: 999px; border: 1px solid var(--hairline);
+  background: var(--surface); color: var(--ink-2);
+}
+.active .pill .ic { width: 12px; height: 12px; color: var(--ink-3); }
+.active .pill i { font-style: normal; color: var(--ink-3); }
+.active .pill.on {
+  border-color: var(--accent); background: var(--accent-soft); color: var(--accent); font-weight: 600;
+}
+.active .pill.on i, .active .pill.on .ic { color: var(--accent); }
+.chip .sw { display: inline-block; width: 8px; height: 8px; border-radius: 2px;
+  background: var(--c); margin-right: 6px; vertical-align: baseline; }
+/* An unpicked group keeps its own colour in the swatch -- the chip greys, the identity
+   does not, so the legend/chip/line mapping never depends on what is selected. */
+.chip[aria-pressed="false"] { opacity: .55; }
+.chip[aria-pressed="false"]:hover { opacity: 1; }
+
+/* ---------- trend plot ---------- */
+.plot { margin: 0; }
+#tr-svg { display: block; width: 100%; height: auto; overflow: visible; }
+/* Stroke comes from CSS through --c, never an SVG presentation attribute: var() is not
+   resolved in a presentation attribute, so the mark would fall back to black. */
+.tline { fill: none; stroke: var(--c); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.tdot { fill: var(--c); stroke: var(--surface); stroke-width: 2; }
+/* A bucket the data has not finished filling is drawn hollow, so a part period
+   cannot be misread as a fall. */
+.tdot.partial { fill: var(--surface); stroke: var(--c); }
+.tgrid { stroke: var(--hairline-2); stroke-width: 1; }
+.taxis { stroke: var(--hairline); stroke-width: 1; }
+.tlabel { fill: var(--ink-3); font-size: 11px; font-variant-numeric: tabular-nums; }
+.tlabel.y { text-anchor: end; }
+.tlabel.x { text-anchor: middle; }
+.tcross { stroke: var(--ink-3); stroke-width: 1; pointer-events: none; }
+.tempty { fill: var(--ink-3); font-size: 13px; text-anchor: middle; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 12px 0 0; padding: 0; }
+.lg { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--ink-2); }
+.lg .sw { width: 9px; height: 9px; border-radius: 2px; background: var(--c); flex: none; }
+.lg .lv { color: var(--ink-3); font-variant-numeric: tabular-nums; }
+
+.trend-scroll { max-height: min(58vh, 560px); }
+
+/* The footer's grain comparison. `table` and `thead th` are styled globally for the
+   monthly grid -- full width, sticky, uppercase, right-aligned - so this resets them
+   rather than inheriting a sticky header into a paragraph of prose. */
+.gtab { width: auto; border-spacing: 0; margin: 12px 0 0; font-size: 12px; }
+.gtab th, .gtab td {
+  position: static; background: none; box-shadow: none; text-align: right;
+  padding: 5px 20px 5px 0; white-space: nowrap; border-bottom: 1px solid var(--hairline-2);
+}
+.gtab th {
+  font-size: 10.5px; font-weight: 700; letter-spacing: .085em; text-transform: uppercase;
+  color: var(--ink-3);
+}
+.gtab th:first-child, .gtab td:first-child { text-align: left; }
+.gtab td { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.gtab tr.on td { color: var(--ink); font-weight: 600; }
+.gtab td .now { color: var(--accent); font-weight: 600; margin-left: 8px; }
+.trend-table { font-variant-numeric: tabular-nums; }
 
 /* Horizontal bars: length is the comparison, so both charts share one scale and one row
    order, which lets a group's revenue bar be read directly against its cost bar. */
@@ -356,7 +517,7 @@ td.tot { font-weight: 600; }
   box-shadow: 0 6px 24px rgba(0,0,0,.18); padding: 9px 11px; font-size: 12.5px;
 }
 #tip .tt { font-weight: 600; margin-bottom: 3px; display: flex; align-items: center; gap: 7px; }
-#tip .sw { width: 9px; height: 9px; border-radius: 2px; flex: none; background: var(--c); }
+#tip .sw, .opt .sw { width: 9px; height: 9px; border-radius: 2px; flex: none; background: var(--c); }
 #tip .tr { color: var(--ink-2); font-variant-numeric: tabular-nums; }
 
 footer {
@@ -365,6 +526,7 @@ footer {
   border-radius: 10px; box-shadow: var(--shadow);
   color: var(--ink-2); font-size: 12px; line-height: 1.65;
 }
+footer .fnote { margin: 0 0 14px; max-width: 78ch; }
 footer h2 {
   margin: 0 0 14px; font-size: 13.5px; font-weight: 600;
   letter-spacing: -.005em; color: var(--ink);
@@ -384,6 +546,12 @@ footer .flag {
   border-top: 1px solid var(--hairline-2);
 }
 footer .flag b { color: var(--warn); }
+/* The flag styling was written for the conversion warning, where amber on everything is
+   the point. An explanatory note borrows its separated block but not its alarm: body text
+   stays in normal ink, and only the bold runs are emphasised. */
+footer .flag[role="note"] { color: var(--ink-2); line-height: 1.7; max-width: 78ch; }
+footer .flag[role="note"] b { color: var(--ink); }
+footer .flag[role="note"] i { color: var(--ink); font-style: normal; font-weight: 500; }
 @media (max-width: 640px) {
   .defs { grid-template-columns: 1fr; gap: 2px 0; }
   .defs dd { margin-bottom: 9px; }
@@ -404,6 +572,18 @@ footer .flag b { color: var(--warn); }
 </style>
 
 <div class="wrap">
+<svg class="sprite" aria-hidden="true" focusable="false">
+  <symbol id="ic-cal" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 2.5v4M16 2.5v4M3 11h18"/></symbol>
+  <symbol id="ic-funnel" viewBox="0 0 24 24"><path d="M3 5h18l-7 8.2V20l-4 2v-8.8z"/></symbol>
+  <symbol id="ic-bolt" viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></symbol>
+  <symbol id="ic-eye" viewBox="0 0 24 24"><path d="M2 12s3.7-6.2 10-6.2S22 12 22 12s-3.7 6.2-10 6.2S2 12 2 12z"/><circle cx="12" cy="12" r="2.6"/></symbol>
+  <symbol id="ic-layers" viewBox="0 0 24 24"><path d="M12 2.8 3 7.6l9 4.8 9-4.8z"/><path d="M3 12.4l9 4.8 9-4.8"/><path d="M3 17.2 12 22l9-4.8"/></symbol>
+  <symbol id="ic-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7.5" height="7.5" rx="1.6"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.6"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.6"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.6"/></symbol>
+  <symbol id="ic-badge" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="9" cy="10.5" r="2.3"/><path d="M5.6 17a3.8 3.8 0 0 1 6.8 0M14.5 9.5h4M14.5 13.5h4"/></symbol>
+  <symbol id="ic-tag" viewBox="0 0 24 24"><path d="M3 12.4V4a1 1 0 0 1 1-1h8.4a1 1 0 0 1 .7.3l7.6 7.6a1 1 0 0 1 0 1.4l-8.4 8.4a1 1 0 0 1-1.4 0L3.3 13.1a1 1 0 0 1-.3-.7z"/><circle cx="7.8" cy="7.8" r="1.4"/></symbol>
+  <symbol id="ic-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.6"/><path d="M4.6 20.5a7.4 7.4 0 0 1 14.8 0"/></symbol>
+  <symbol id="ic-reset" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.5-5.8"/><path d="M20 3.5V9h-5.5"/></symbol>
+</svg>
   <header class="masthead">
     <div>
       <p class="eyebrow" id="co"></p>
@@ -416,6 +596,15 @@ footer .flag b { color: var(--warn); }
       <div class="postings">Postings <b id="range"></b></div>
     </div>
   </header>
+
+  <nav class="tabs" role="tablist" aria-label="Views">
+    <button type="button" class="tab" role="tab" id="tab-margin" aria-controls="panel-margin" aria-selected="true">Sales margin</button>
+    <button type="button" class="tab" role="tab" id="tab-trend" aria-controls="panel-trend" aria-selected="false" tabindex="-1">MT trend</button>
+    <button type="button" class="tab" role="tab" id="tab-rev" aria-controls="panel-rev" aria-selected="false" tabindex="-1">Revenue trend</button>
+    <button type="button" class="tab" role="tab" id="tab-gp" aria-controls="panel-gp" aria-selected="false" tabindex="-1">Gross profit trend</button>
+  </nav>
+
+  <div id="panel-margin" role="tabpanel" aria-labelledby="tab-margin">
 
   <section class="filters" aria-label="Filters">
     <div class="field">
@@ -444,6 +633,37 @@ footer .flag b { color: var(--warn); }
           </div>
         </div>
         <div class="opts" id="opts"></div>
+      </div>
+    </div>
+    <div class="field picker">
+      <label for="spick">Salesperson</label>
+      <button type="button" class="picker-btn" id="spick" aria-expanded="false" aria-haspopup="true">
+        <span id="spicklabel">All salespeople</span><span class="caret">&#9660;</span>
+      </button>
+      <div class="panel narrow" id="sppanel" hidden>
+        <div class="panel-head">
+          <div class="panel-acts">
+            <button type="button" class="link" id="spall">Select all</button>
+            <button type="button" class="link" id="spnone">Clear</button>
+          </div>
+        </div>
+        <div class="opts" id="spopts"></div>
+      </div>
+    </div>
+    <div class="field picker">
+      <label for="gpick">Product group</label>
+      <button type="button" class="picker-btn" id="gpick" aria-expanded="false" aria-haspopup="true"
+              title="Gen. Prod. Posting Group on the value entry">
+        <span id="gpicklabel">All product groups</span><span class="caret">&#9660;</span>
+      </button>
+      <div class="panel narrow" id="gppanel" hidden>
+        <div class="panel-head">
+          <div class="panel-acts">
+            <button type="button" class="link" id="gpall">Select all</button>
+            <button type="button" class="link" id="gpnone">Clear</button>
+          </div>
+        </div>
+        <div class="opts" id="gpopts"></div>
       </div>
     </div>
     <div class="field reset">
@@ -513,33 +733,556 @@ footer .flag b { color: var(--warn); }
     </div>
   </section>
 
-  <footer>
-    <h2>How each figure is calculated</h2>
-    <dl class="defs">
-      <dt>Total MT</dt>
-      <dd>Tonnage shipped, in metric tonnes &mdash; kilograms divided by 1,000. Counted <b>once per delivery</b>: Business Central records a shipment several times over (the delivery, a cost adjustment, then the invoice) and repeats the weight on each, so only the entry carrying the item ledger quantity is used. <span class="src">WIN_Total_Qty_in_Kg &divide; 1,000, where Item_Ledger_Entry_Quantity &ne; 0</span></dd>
+    <footer>
+      <h2>How each figure is calculated</h2>
+      <dl class="defs">
+        <dt>Total MT</dt>
+        <dd>Tonnage shipped, in metric tonnes &mdash; kilograms divided by 1,000. Counted <b>once per delivery</b>: Business Central records a shipment several times over (the delivery, a cost adjustment, then the invoice) and repeats the weight on each, so only the entry carrying the item ledger quantity is used. <span class="src">WIN_Total_Qty_in_Kg &divide; 1,000, where Item_Ledger_Entry_Quantity &ne; 0</span></dd>
 
-      <dt>Revenue</dt>
-      <dd>Sales value of the goods shipped, <b>whether or not they have been invoiced yet</b>. A delivery posts an expected value; the invoice reverses it and posts the actual, so both are added together and the figure is right at any stage of the cycle. <span class="src">Sales_Amount_Actual_New + Sales_Amount_Expected_New</span></dd>
+        <dt>Revenue</dt>
+        <dd>Sales value of the goods shipped, <b>whether or not they have been invoiced yet</b>. A delivery posts an expected value; the invoice reverses it and posts the actual, so both are added together and the figure is right at any stage of the cycle. <span class="src">Sales_Amount_Actual + Sales_Amount_Expected</span></dd>
 
-      <dt>Cost of sales</dt>
-      <dd>What the goods themselves cost &mdash; the inventory value released when they left the warehouse. <b>Product cost only</b>: no overheads, freight or delivery charges. It follows the same actual-plus-expected pattern as revenue, so goods shipped but not yet invoiced still carry their cost, and it picks up later cost adjustments once Business Central has posted them. <span class="src">Cost_Amount_Actual + Cost_Amount_Expected</span></dd>
+        <dt>Cost of sales</dt>
+        <dd>What the goods themselves cost &mdash; the inventory value released when they left the warehouse. <b>Product cost only</b>: no overheads, freight or delivery charges. It follows the same actual-plus-expected pattern as revenue, so goods shipped but not yet invoiced still carry their cost, and it picks up later cost adjustments once Business Central has posted them. <span class="src">Cost_Amount_Actual + Cost_Amount_Expected</span></dd>
 
-      <dt>Gross profit</dt>
-      <dd>Revenue minus cost of sales. Negative means the goods sold for less than they cost.</dd>
+        <dt>Gross profit</dt>
+        <dd>Revenue minus cost of sales. Negative means the goods sold for less than they cost.</dd>
 
-      <dt>GP %</dt>
-      <dd>Gross profit as a share of revenue. Worked out from each month's own revenue and cost, <b>never averaged across months</b>, so a small month cannot distort the total.</dd>
-    </dl>
+        <dt>GP %</dt>
+        <dd>Gross profit as a share of revenue. Worked out from each month's own revenue and cost, <b>never averaged across months</b>, so a small month cannot distort the total.</dd>
 
-    <div class="fgrid">
-      <div><b>What is counted.</b> Sales deliveries, invoices, return receipts and credit memos; returns and credit memos subtract. Internal postings and delivery-charge lines are left out, as the latter earn revenue but carry no tonnage.</div>
-      <div><b>Reading the table.</b> Months run left to right, each showing all five figures, with the period total on the right. Every column sorts. A dash means no trade that month.</div>
-      <div><b>Rounding.</b> Amounts are Singapore dollars, and month cells are abbreviated to thousands (K) or millions (M) to keep the table readable &mdash; hover any cell for the exact figure. Totals are worked out at full precision, so a column may differ by a cent from adding up the rounded figures on screen.</div>
-      <div><b>Filters.</b> The posting date range and customer selection at the top drive everything on the page &mdash; the four headline figures, the table and both charts all move together.</div>
-      <div><b>The two charts share one scale</b> and one row order, so a product's revenue bar can be read straight across against its cost bar: wherever the lower bar is the longer one, that product sold below cost.</div>
-    </div>
+        <dt>Price per MT</dt>
+        <dd>Average realised selling price per tonne &mdash; revenue divided by tonnage. Like GP %, it is worked out from each month's own revenue and tonnage and <b>never averaged across months</b>, so a light month cannot pull the total. A month carrying revenue but no tonnage shows 0.00 rather than an unbounded figure. <span class="src">Revenue &divide; Total MT</span></dd>
+      </dl>
 
+      <div class="fgrid">
+        <div><b>What is counted.</b> Sales deliveries, invoices, return receipts and credit memos; returns and credit memos subtract. Internal postings and delivery-charge lines are left out, as the latter earn revenue but carry no tonnage.</div>
+        <div><b>Reading the table.</b> Months run left to right, each showing all six figures, with the period total on the right. Every column sorts. A dash means no trade that month.</div>
+        <div><b>Rounding.</b> Amounts are Singapore dollars, and month cells are abbreviated to thousands (K) or millions (M) to keep the table readable &mdash; hover any cell for the exact figure. Totals are worked out at full precision, so a column may differ by a cent from adding up the rounded figures on screen.</div>
+        <div><b>Filters.</b> The posting date range, customer, salesperson and product group selections at the top drive everything on this tab &mdash; the four headline figures, the table and both charts all move together.</div>
+        <div><b>The two charts share one scale</b> and one row order, so a product's revenue bar can be read straight across against its cost bar: wherever the lower bar is the longer one, that product sold below cost.</div>
+      </div>
+    </footer>
+
+  </div><!-- /panel-margin -->
+
+  <div id="panel-trend" role="tabpanel" aria-labelledby="tab-trend" hidden>
+    <section class="card">
+      <div class="card-head">
+        <p class="eyebrow">Trend</p>
+        <h2>MT trend</h2>
+        <p class="hint" id="tr-hint"></p>
+      </div>
+
+      <!-- The slicer band scopes this whole tab, which holds exactly one chart and its
+           table twin. That keeps it a filter row above everything it scopes rather than a
+           per-chart filter competing with a page-level one. Grouped under headings so the
+           six controls read as three decisions: which period, which postings, how shown. -->
+      <div class="slicers" aria-label="MT trend filters">
+        <div class="field f-date">
+          <label for="tr-from"><svg class="ic"><use href="#ic-cal"/></svg>Posting date</label>
+          <div class="ctl dates">
+            <input type="date" id="tr-from" aria-label="MT trend posting date from">
+            <span>to</span>
+            <input type="date" id="tr-to" aria-label="MT trend posting date to">
+          </div>
+        </div>
+
+        <div class="field f-quick">
+          <label id="tr-pl"><svg class="ic"><use href="#ic-bolt"/></svg>Quick range</label>
+          <div class="ctl presets even" role="group" aria-labelledby="tr-pl" id="tr-presets"></div>
+        </div>
+
+        <div class="field f-grain">
+          <label id="tr-grl"><svg class="ic"><use href="#ic-layers"/></svg>Grain</label>
+          <div class="ctl presets even" role="group" aria-labelledby="tr-grl" id="tr-grain"></div>
+        </div>
+
+        <div class="field f-view">
+          <label id="tr-vl"><svg class="ic"><use href="#ic-eye"/></svg>View</label>
+          <div class="ctl presets even" role="group" aria-labelledby="tr-vl">
+            <button type="button" class="chip" id="tr-chart" aria-pressed="true">Chart</button>
+            <button type="button" class="chip" id="tr-table" aria-pressed="false">Table</button>
+          </div>
+        </div>
+
+        <div class="field picker f-cust">
+          <label for="tr-pick"><svg class="ic"><use href="#ic-user"/></svg>Customer</label>
+          <div class="ctl">
+            <button type="button" class="picker-btn" id="tr-pick" aria-expanded="false" aria-haspopup="true">
+              <span id="tr-picklabel">All customers</span><span class="caret">&#9660;</span>
+            </button>
+          </div>
+          <div class="panel" id="tr-panel" hidden>
+            <div class="panel-head">
+              <input type="search" class="search-input" id="tr-search" placeholder="Search customers" aria-label="Search customers">
+              <div class="panel-acts">
+                <button type="button" class="link" id="tr-selall">Select all</button>
+                <button type="button" class="link" id="tr-selnone">Clear</button>
+              </div>
+            </div>
+            <div class="opts" id="tr-opts"></div>
+          </div>
+        </div>
+
+        <div class="field f-groups">
+          <label id="tr-gl"><svg class="ic"><use href="#ic-grid"/></svg>Product group</label>
+          <div class="ctl presets fill" role="group" aria-labelledby="tr-gl" id="tr-groups"></div>
+        </div>
+
+        <div class="field f-reset">
+          <label><svg class="ic"><use href="#ic-reset"/></svg>Clear</label>
+          <div class="ctl">
+            <button type="button" class="chip reset-chip" id="tr-reset">Reset filters</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="active" id="tr-active" aria-live="polite"></div>
+
+      <div class="chart-body" id="tr-chartview">
+        <figure class="plot">
+          <svg id="tr-svg" viewBox="0 0 960 380" preserveAspectRatio="xMidYMid meet"
+               role="img" aria-labelledby="tr-title tr-desc">
+            <title id="tr-title">Tonnage shipped by posting period, one line per general product posting group</title>
+            <desc id="tr-desc">Switch to the Table view for the same figures as text.</desc>
+          </svg>
+          <figcaption class="legend" id="tr-legend"></figcaption>
+        </figure>
+      </div>
+
+      <div class="chart-body" id="tr-tableview" hidden>
+        <div class="table-scroll trend-scroll">
+          <table class="trend-table">
+            <thead id="tr-thead"></thead>
+            <tbody id="tr-tbody"></tbody>
+            <tfoot id="tr-tfoot"></tfoot>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <h2>How the trend is calculated</h2>
+      <p class="fnote">What the chart shows. How Day, Week and Month bucket the data is set out below.</p>
+      <dl class="defs">
+        <dt>Total MT</dt>
+        <dd>Tonnage shipped, in metric tonnes &mdash; kilograms divided by 1,000. Counted <b>once per delivery</b>: Business Central records a shipment several times over (the delivery, a cost adjustment, then the invoice) and repeats the weight on each, so only the entry carrying the item ledger quantity is used. <span class="src">WIN_Total_Qty_in_Kg &divide; 1,000, where Item_Ledger_Entry_Quantity &ne; 0</span></dd>
+
+        <dt>A point on the line</dt>
+        <dd>The <b>total tonnage shipped in that period</b> by that product group &mdash; a plain sum, not an average and not a smoothed figure. Changing the grain regroups the same deliveries into larger buckets, so every grain adds up to exactly the same tonnage.</dd>
+
+        <dt>A period with no shipment</dt>
+        <dd>Drawn as <b>zero, not as a gap</b>. A group that recorded nothing that period really did record nothing, and a continuous line lets two groups be read against each other over the same span.</dd>
+
+        <dt>A part period</dt>
+        <dd>The final point is drawn <b>hollow</b> when its period has not finished &mdash; three days into a month, say. It is a bucket still filling, not a fall.</dd>
+      </dl>
+
+      <div class="fgrid">
+        <div><b>What is counted.</b> The same scope as the other tabs: sales deliveries, invoices, return receipts and credit memos, with internal postings and delivery-charge lines left out. Returns and credit memos <b>subtract</b>, so a period can show a negative figure &mdash; a real net return, not an error, and never flipped to positive.</div>
+        <div><b>Reading the chart.</b> Height is tonnage in metric tonnes, left to right is time, and each line is one general product posting group. Hover anywhere on the plot for a crosshair and every group's figure at the nearest period &mdash; you do not have to hit the line itself.</div>
+        <div><b>The scale follows your selection.</b> NAOH is about three quarters of all tonnage, so while it is shown the other six lines sit almost flat. Untick it and the rest rescale. Colour stays with the product group either way, so hiding one never repaints the others.</div>
+        <div><b>Filters.</b> The controls in this tile drive the chart and the table together, and the strip under them shows which are narrowing the view. They are <b>independent of the other tabs</b> &mdash; a customer filtered here does not narrow anything elsewhere.</div>
+      </div>
+    </footer>
+
+    <footer>
+      <h2>How Day, Week and Month are calculated</h2>
+      <p class="fnote">All three settings show the same postings. The only thing that changes is <b>how many days are added together before a point is drawn</b>. The total is identical whichever you pick &mdash; nothing is averaged, estimated or smoothed away.</p>
+      <dl class="defs">
+        <dt>Day</dt>
+        <dd>One point for <b>each date goods were posted</b>, worth the shipment recorded that day. The most detail, but postings arrive in lumps, so the line jumps sharply and the shape is hard to read.</dd>
+
+        <dt>Week</dt>
+        <dd>Days are grouped into <b>weeks running Monday to Sunday</b>. All seven days are added together and the point is drawn on the Monday.</dd>
+
+        <dt>Month</dt>
+        <dd>Days are grouped by <b>calendar month</b>. Everything posted in a month is added together and the point is drawn on the 1st. This is the default, because it is the setting at which the line reads as a direction of travel rather than a series of jumps.</dd>
+
+        <dt>Which one to use</dt>
+        <dd><b>Month</b> to see the overall direction. <b>Week</b> when a month is too coarse to show movement inside it. <b>Day</b> when you have spotted a jump and want to find the individual posting behind it.</dd>
+
+        <dt>Weeks do not add up to months</dt>
+        <dd>A week can begin in one month and end in the next, so its total belongs partly to each. Weeks and months each add up correctly on their own, but you cannot reconcile one week against one month. Only days divide cleanly into both.</dd>
+      </dl>
+
+      <div class="flag" role="note">
+        <div><b>Part weeks and part months at the ends of your date range.</b> A week or a month is only shown in full if your date range covers all of it. At either end it can be cut short, and a cut-short point sits lower than a full one simply because it holds fewer days &mdash; not because less was shipped.
+        <br><br>
+        <b>A common example.</b> You set the range to <b>1&ndash;31 July</b> and read by week. July does not begin on a Monday and does not end on a Sunday, so both ends land mid-week:
+        <br>&bull; The first point is the week commencing <b>29 June</b>, but it holds only <b>1&ndash;5 July</b>. 29 and 30 June are excluded by your <i>from</i> date.
+        <br>&bull; The last point is the week commencing <b>27 July</b>, but it holds only <b>27&ndash;31 July</b>. 1 and 2 August are excluded by your <i>to</i> date.
+        <br><br>
+        Both points hold five days rather than seven, so both sit lower than a full week &mdash; and if a large posting happened to fall on one of the excluded days, that point understates the week badly. The same happens by month whenever a range starts or ends part-way through one.
+        <br><br>
+        <b>To compare periods fairly</b>, start the range on a Monday and end it on a Sunday when reading by week, and use whole months when reading by month. The figures themselves are always right for the days in range &mdash; it is the comparison between points that a cut-short period distorts.</div>
+      </div>
+
+      <p class="fnote">The table below compares the three settings <b>for what you have selected right now</b>. The last column divides the busiest period by a typical one: the lower that figure, the steadier the line and the easier the trend is to read. The totals are there to show that all three settings account for exactly the same amount.</p>
+      <table class="gtab" id="tr-grainstats"></table>
+      <p class="fnote"><b>Table view</b>, at the top of this tile, lists the same figures as text at whichever setting is selected &mdash; period by period, with totals for each product group and each period &mdash; so nothing here can only be read off the chart.</p>
+    </footer>
+  </div><!-- /panel-trend -->
+
+  <div id="panel-rev" role="tabpanel" aria-labelledby="tab-rev" hidden>
+    <section class="card">
+      <div class="card-head">
+        <p class="eyebrow">Trend</p>
+        <h2>Revenue trend</h2>
+        <p class="hint" id="rv-hint"></p>
+      </div>
+
+      <!-- The slicer band scopes this whole tab, which holds exactly one chart and its
+           table twin. That keeps it a filter row above everything it scopes rather than a
+           per-chart filter competing with a page-level one. Grouped under headings so the
+           six controls read as three decisions: which period, which postings, how shown. -->
+      <div class="slicers" aria-label="Revenue trend filters">
+        <div class="field f-date">
+          <label for="rv-from"><svg class="ic"><use href="#ic-cal"/></svg>Posting date</label>
+          <div class="ctl dates">
+            <input type="date" id="rv-from" aria-label="Revenue trend posting date from">
+            <span>to</span>
+            <input type="date" id="rv-to" aria-label="Revenue trend posting date to">
+          </div>
+        </div>
+
+        <div class="field f-quick">
+          <label id="rv-pl"><svg class="ic"><use href="#ic-bolt"/></svg>Quick range</label>
+          <div class="ctl presets even" role="group" aria-labelledby="rv-pl" id="rv-presets"></div>
+        </div>
+
+        <div class="field f-grain">
+          <label id="rv-grl"><svg class="ic"><use href="#ic-layers"/></svg>Grain</label>
+          <div class="ctl presets even" role="group" aria-labelledby="rv-grl" id="rv-grain"></div>
+        </div>
+
+        <div class="field f-view">
+          <label id="rv-vl"><svg class="ic"><use href="#ic-eye"/></svg>View</label>
+          <div class="ctl presets even" role="group" aria-labelledby="rv-vl">
+            <button type="button" class="chip" id="rv-chart" aria-pressed="true">Chart</button>
+            <button type="button" class="chip" id="rv-table" aria-pressed="false">Table</button>
+          </div>
+        </div>
+
+        <div class="field picker f-cust">
+          <label for="rv-pick"><svg class="ic"><use href="#ic-user"/></svg>Customer</label>
+          <div class="ctl">
+            <button type="button" class="picker-btn" id="rv-pick" aria-expanded="false" aria-haspopup="true">
+              <span id="rv-picklabel">All customers</span><span class="caret">&#9660;</span>
+            </button>
+          </div>
+          <div class="panel" id="rv-panel" hidden>
+            <div class="panel-head">
+              <input type="search" class="search-input" id="rv-search" placeholder="Search customers" aria-label="Search customers">
+              <div class="panel-acts">
+                <button type="button" class="link" id="rv-selall">Select all</button>
+                <button type="button" class="link" id="rv-selnone">Clear</button>
+              </div>
+            </div>
+            <div class="opts" id="rv-opts"></div>
+          </div>
+        </div>
+
+        <div class="field picker f-sp">
+          <label for="rv-sppick"><svg class="ic"><use href="#ic-badge"/></svg>Salesperson</label>
+          <div class="ctl">
+            <button type="button" class="picker-btn" id="rv-sppick" aria-expanded="false" aria-haspopup="true">
+              <span id="rv-splabel">All salespeople</span><span class="caret">&#9660;</span>
+            </button>
+          </div>
+          <div class="panel narrow" id="rv-sppanel" hidden>
+            <div class="panel-head">
+              <div class="panel-acts">
+                <button type="button" class="link" id="rv-spselall">Select all</button>
+                <button type="button" class="link" id="rv-spselnone">Clear</button>
+              </div>
+            </div>
+            <div class="opts" id="rv-spopts"></div>
+          </div>
+        </div>
+
+        <div class="field picker f-sector">
+          <label for="rv-sectorpick"><svg class="ic"><use href="#ic-tag"/></svg>Sector</label>
+          <div class="ctl">
+            <button type="button" class="picker-btn" id="rv-sectorpick" aria-expanded="false" aria-haspopup="true">
+              <span id="rv-sectorlabel">All sectors</span><span class="caret">&#9660;</span>
+            </button>
+          </div>
+          <div class="panel narrow" id="rv-sectorpanel" hidden>
+            <div class="panel-head">
+              <div class="panel-acts">
+                <button type="button" class="link" id="rv-sectorselall">Select all</button>
+                <button type="button" class="link" id="rv-sectorselnone">Clear</button>
+              </div>
+            </div>
+            <div class="opts" id="rv-sectoropts"></div>
+          </div>
+        </div>
+
+        <div class="field f-groups">
+          <label id="rv-gl"><svg class="ic"><use href="#ic-grid"/></svg>Product group</label>
+          <div class="ctl presets fill" role="group" aria-labelledby="rv-gl" id="rv-groups"></div>
+        </div>
+
+        <div class="field f-reset">
+          <label><svg class="ic"><use href="#ic-reset"/></svg>Clear</label>
+          <div class="ctl">
+            <button type="button" class="chip reset-chip" id="rv-reset">Reset filters</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="active" id="rv-active" aria-live="polite"></div>
+
+      <div class="chart-body" id="rv-chartview">
+        <figure class="plot">
+          <svg id="rv-svg" viewBox="0 0 960 380" preserveAspectRatio="xMidYMid meet"
+               role="img" aria-labelledby="rv-title rv-desc">
+            <title id="rv-title">Revenue by posting period, one line per general product posting group</title>
+            <desc id="rv-desc">Switch to the Table view for the same figures as text.</desc>
+          </svg>
+          <figcaption class="legend" id="rv-legend"></figcaption>
+        </figure>
+      </div>
+
+      <div class="chart-body" id="rv-tableview" hidden>
+        <div class="table-scroll trend-scroll">
+          <table class="trend-table">
+            <thead id="rv-thead"></thead>
+            <tbody id="rv-tbody"></tbody>
+            <tfoot id="rv-tfoot"></tfoot>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <h2>How the trend is calculated</h2>
+      <p class="fnote">What the chart shows. How Day, Week and Month bucket the data is set out below.</p>
+      <dl class="defs">
+        <dt>Revenue</dt>
+        <dd>Sales value of the goods shipped, <b>whether or not they have been invoiced yet</b>. A delivery posts an expected value; the invoice reverses it and posts the actual, so both are added together and the figure is right at any stage of the cycle. <span class="src">Sales_Amount_Actual + Sales_Amount_Expected</span></dd>
+
+        <dt>A point on the line</dt>
+        <dd>The <b>total revenue posted in that period</b> by that product group &mdash; a plain sum, not an average and not a smoothed figure. Changing the grain regroups the same postings into larger buckets, so every grain adds up to exactly the same revenue.</dd>
+
+        <dt>A period with no revenue</dt>
+        <dd>Drawn as <b>zero, not as a gap</b>. A group that recorded nothing that period really did record nothing, and a continuous line lets two groups be read against each other over the same span.</dd>
+
+        <dt>A part period</dt>
+        <dd>The final point is drawn <b>hollow</b> when its period has not finished &mdash; three days into a month, say. It is a bucket still filling, not a fall.</dd>
+      </dl>
+
+      <div class="fgrid">
+        <div><b>What is counted.</b> The same scope as the other tabs: sales deliveries, invoices, return receipts and credit memos, with internal postings and delivery-charge lines left out. Returns and credit memos <b>subtract</b>, so a period can show a negative figure &mdash; a real net return, not an error, and never flipped to positive.</div>
+        <div><b>Reading the chart.</b> Height is revenue in Singapore dollars, left to right is time, and each line is one general product posting group. Hover anywhere on the plot for a crosshair and every group's figure at the nearest period &mdash; you do not have to hit the line itself.</div>
+        <div><b>The scale follows your selection.</b> NAOH is around seventy per cent of revenue, so while it is shown the other six lines sit almost flat. Untick it and the rest rescale. Colour stays with the product group either way, so hiding one never repaints the others.</div>
+        <div><b>Filters.</b> The controls in this tile drive the chart and the table together, and the strip under them shows which are narrowing the view. They are <b>independent of the other tabs</b> &mdash; a customer filtered here does not narrow anything elsewhere.</div>
+      </div>
+    </footer>
+
+    <footer>
+      <h2>How Day, Week and Month are calculated</h2>
+      <p class="fnote">All three settings show the same postings. The only thing that changes is <b>how many days are added together before a point is drawn</b>. The total is identical whichever you pick &mdash; nothing is averaged, estimated or smoothed away.</p>
+      <dl class="defs">
+        <dt>Day</dt>
+        <dd>One point for <b>each date goods were posted</b>, worth the revenue recorded that day. The most detail, but postings arrive in lumps, so the line jumps sharply and the shape is hard to read.</dd>
+
+        <dt>Week</dt>
+        <dd>Days are grouped into <b>weeks running Monday to Sunday</b>. All seven days are added together and the point is drawn on the Monday.</dd>
+
+        <dt>Month</dt>
+        <dd>Days are grouped by <b>calendar month</b>. Everything posted in a month is added together and the point is drawn on the 1st. This is the default, because it is the setting at which the line reads as a direction of travel rather than a series of jumps.</dd>
+
+        <dt>Which one to use</dt>
+        <dd><b>Month</b> to see the overall direction. <b>Week</b> when a month is too coarse to show movement inside it. <b>Day</b> when you have spotted a jump and want to find the individual posting behind it.</dd>
+
+        <dt>Weeks do not add up to months</dt>
+        <dd>A week can begin in one month and end in the next, so its total belongs partly to each. Weeks and months each add up correctly on their own, but you cannot reconcile one week against one month. Only days divide cleanly into both.</dd>
+      </dl>
+
+      <div class="flag" role="note">
+        <div><b>Part weeks and part months at the ends of your date range.</b> A week or a month is only shown in full if your date range covers all of it. At either end it can be cut short, and a cut-short point sits lower than a full one simply because it holds fewer days &mdash; not because less was sold.
+        <br><br>
+        <b>A common example.</b> You set the range to <b>1&ndash;31 July</b> and read by week. July does not begin on a Monday and does not end on a Sunday, so both ends land mid-week:
+        <br>&bull; The first point is the week commencing <b>29 June</b>, but it holds only <b>1&ndash;5 July</b>. 29 and 30 June are excluded by your <i>from</i> date.
+        <br>&bull; The last point is the week commencing <b>27 July</b>, but it holds only <b>27&ndash;31 July</b>. 1 and 2 August are excluded by your <i>to</i> date.
+        <br><br>
+        Both points hold five days rather than seven, so both sit lower than a full week &mdash; and if a large posting happened to fall on one of the excluded days, that point understates the week badly. The same happens by month whenever a range starts or ends part-way through one.
+        <br><br>
+        <b>To compare periods fairly</b>, start the range on a Monday and end it on a Sunday when reading by week, and use whole months when reading by month. The figures themselves are always right for the days in range &mdash; it is the comparison between points that a cut-short period distorts.</div>
+      </div>
+
+      <p class="fnote">The table below compares the three settings <b>for what you have selected right now</b>. The last column divides the busiest period by a typical one: the lower that figure, the steadier the line and the easier the trend is to read. The totals are there to show that all three settings account for exactly the same amount.</p>
+      <table class="gtab" id="rv-grainstats"></table>
+      <p class="fnote"><b>Table view</b>, at the top of this tile, lists the same figures as text at whichever setting is selected &mdash; period by period, with totals for each product group and each period &mdash; so nothing here can only be read off the chart.</p>
+    </footer>
+  </div><!-- /panel-rev -->
+
+  <div id="panel-gp" role="tabpanel" aria-labelledby="tab-gp" hidden>
+    <section class="card">
+      <div class="card-head">
+        <p class="eyebrow">Trend</p>
+        <h2>Gross profit trend</h2>
+        <p class="hint" id="gp-hint"></p>
+      </div>
+
+      <!-- The slicer band scopes this whole tab, which holds exactly one chart and its
+           table twin. That keeps it a filter row above everything it scopes rather than a
+           per-chart filter competing with a page-level one. Grouped under headings so the
+           six controls read as three decisions: which period, which postings, how shown. -->
+      <div class="slicers" aria-label="Gross profit trend filters">
+        <div class="field f-date">
+          <label for="gp-from"><svg class="ic"><use href="#ic-cal"/></svg>Posting date</label>
+          <div class="ctl dates">
+            <input type="date" id="gp-from" aria-label="Gross profit trend posting date from">
+            <span>to</span>
+            <input type="date" id="gp-to" aria-label="Gross profit trend posting date to">
+          </div>
+        </div>
+
+        <div class="field f-quick">
+          <label id="gp-pl"><svg class="ic"><use href="#ic-bolt"/></svg>Quick range</label>
+          <div class="ctl presets even" role="group" aria-labelledby="gp-pl" id="gp-presets"></div>
+        </div>
+
+        <div class="field f-grain">
+          <label id="gp-grl"><svg class="ic"><use href="#ic-layers"/></svg>Grain</label>
+          <div class="ctl presets even" role="group" aria-labelledby="gp-grl" id="gp-grain"></div>
+        </div>
+
+        <div class="field f-view">
+          <label id="gp-vl"><svg class="ic"><use href="#ic-eye"/></svg>View</label>
+          <div class="ctl presets even" role="group" aria-labelledby="gp-vl">
+            <button type="button" class="chip" id="gp-chart" aria-pressed="true">Chart</button>
+            <button type="button" class="chip" id="gp-table" aria-pressed="false">Table</button>
+          </div>
+        </div>
+
+        <div class="field picker f-cust">
+          <label for="gp-pick"><svg class="ic"><use href="#ic-user"/></svg>Customer</label>
+          <div class="ctl">
+            <button type="button" class="picker-btn" id="gp-pick" aria-expanded="false" aria-haspopup="true">
+              <span id="gp-picklabel">All customers</span><span class="caret">&#9660;</span>
+            </button>
+          </div>
+          <div class="panel" id="gp-panel" hidden>
+            <div class="panel-head">
+              <input type="search" class="search-input" id="gp-search" placeholder="Search customers" aria-label="Search customers">
+              <div class="panel-acts">
+                <button type="button" class="link" id="gp-selall">Select all</button>
+                <button type="button" class="link" id="gp-selnone">Clear</button>
+              </div>
+            </div>
+            <div class="opts" id="gp-opts"></div>
+          </div>
+        </div>
+
+        <div class="field f-groups">
+          <label id="gp-gl"><svg class="ic"><use href="#ic-grid"/></svg>Product group</label>
+          <div class="ctl presets fill" role="group" aria-labelledby="gp-gl" id="gp-groups"></div>
+        </div>
+
+        <div class="field f-reset">
+          <label><svg class="ic"><use href="#ic-reset"/></svg>Clear</label>
+          <div class="ctl">
+            <button type="button" class="chip reset-chip" id="gp-reset">Reset filters</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="active" id="gp-active" aria-live="polite"></div>
+
+      <div class="chart-body" id="gp-chartview">
+        <figure class="plot">
+          <svg id="gp-svg" viewBox="0 0 960 380" preserveAspectRatio="xMidYMid meet"
+               role="img" aria-labelledby="gp-title gp-desc">
+            <title id="gp-title">Gross profit by posting period, one line per general product posting group</title>
+            <desc id="gp-desc">Switch to the Table view for the same figures as text.</desc>
+          </svg>
+          <figcaption class="legend" id="gp-legend"></figcaption>
+        </figure>
+      </div>
+
+      <div class="chart-body" id="gp-tableview" hidden>
+        <div class="table-scroll trend-scroll">
+          <table class="trend-table">
+            <thead id="gp-thead"></thead>
+            <tbody id="gp-tbody"></tbody>
+            <tfoot id="gp-tfoot"></tfoot>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <h2>How the trend is calculated</h2>
+      <p class="fnote">What the chart shows. How Day, Week and Month bucket the data is set out below.</p>
+      <dl class="defs">
+        <dt>Gross profit</dt>
+        <dd>Revenue minus cost of sales, worked out <b>period by period from that period&rsquo;s own figures</b>. Cost of sales is product cost only &mdash; the inventory value released when the goods left the warehouse, with no overheads, freight or delivery charges. Both sides follow the same actual-plus-expected pattern, so goods shipped but not yet invoiced carry both their value and their cost. <span class="src">(Sales_Amount_Actual + Sales_Amount_Expected) &minus; (Cost_Amount_Actual + Cost_Amount_Expected)</span></dd>
+
+        <dt>A point on the line</dt>
+        <dd>The <b>gross profit earned in that period</b> by that product group &mdash; the period&rsquo;s revenue less the period&rsquo;s cost. Changing the grain regroups the same postings into larger buckets, so every grain adds up to exactly the same gross profit.</dd>
+
+        <dt>Below the zero line</dt>
+        <dd><b>A line under the baseline means those goods sold for less than they cost.</b> That is not an error and it is not rare here &mdash; whole product groups run negative. The zero line is drawn across the plot for exactly this reason, so loss-making periods are visible at a glance rather than inferred from a small number.</dd>
+
+        <dt>A period with no trade</dt>
+        <dd>Drawn as <b>zero, not as a gap</b>. A group that recorded nothing that period really did record nothing, and a continuous line lets two groups be read against each other over the same span.</dd>
+
+        <dt>A part period</dt>
+        <dd>The final point is drawn <b>hollow</b> when its period has not finished &mdash; three days into a month, say. It is a bucket still filling, not a fall.</dd>
+      </dl>
+
+      <div class="fgrid">
+        <div><b>What is counted.</b> The same scope as the other tabs: sales deliveries, invoices, return receipts and credit memos, with internal postings and delivery-charge lines left out. Returns and credit memos <b>subtract</b>, so a period can show a negative figure &mdash; a real net return, not an error, and never flipped to positive.</div>
+        <div><b>Reading the chart.</b> Height is gross profit in Singapore dollars, above and below zero, left to right is time, and each line is one general product posting group. Hover anywhere on the plot for a crosshair and every group's figure at the nearest period &mdash; you do not have to hit the line itself.</div>
+        <div><b>The scale follows your selection.</b> One or two groups carry most of the profit, and others sit below zero, so the scale is set by whichever you have on. Untick the largest and the rest rescale. Colour stays with the product group either way, so hiding one never repaints the others.</div>
+        <div><b>Filters.</b> The controls in this tile drive the chart and the table together, and the strip under them shows which are narrowing the view. They are <b>independent of the other tabs</b> &mdash; a customer filtered here does not narrow anything elsewhere.</div>
+      </div>
+    </footer>
+
+    <footer>
+      <h2>How Day, Week and Month are calculated</h2>
+      <p class="fnote">All three settings show the same postings. The only thing that changes is <b>how many days are added together before a point is drawn</b>. The total is identical whichever you pick &mdash; nothing is averaged, estimated or smoothed away.</p>
+      <dl class="defs">
+        <dt>Day</dt>
+        <dd>One point for <b>each date goods were posted</b>, worth the trade recorded that day. The most detail, but postings arrive in lumps, so the line jumps sharply and the shape is hard to read.</dd>
+
+        <dt>Week</dt>
+        <dd>Days are grouped into <b>weeks running Monday to Sunday</b>. All seven days are added together and the point is drawn on the Monday.</dd>
+
+        <dt>Month</dt>
+        <dd>Days are grouped by <b>calendar month</b>. Everything posted in a month is added together and the point is drawn on the 1st. This is the default, because it is the setting at which the line reads as a direction of travel rather than a series of jumps.</dd>
+
+        <dt>Which one to use</dt>
+        <dd><b>Month</b> to see the overall direction. <b>Week</b> when a month is too coarse to show movement inside it. <b>Day</b> when you have spotted a jump and want to find the individual posting behind it.</dd>
+
+        <dt>Weeks do not add up to months</dt>
+        <dd>A week can begin in one month and end in the next, so its total belongs partly to each. Weeks and months each add up correctly on their own, but you cannot reconcile one week against one month. Only days divide cleanly into both.</dd>
+      </dl>
+
+      <div class="flag" role="note">
+        <div><b>Part weeks and part months at the ends of your date range.</b> A week or a month is only shown in full if your date range covers all of it. At either end it can be cut short, and a cut-short point sits lower than a full one simply because it holds fewer days &mdash; not because less was earned.
+        <br><br>
+        <b>A common example.</b> You set the range to <b>1&ndash;31 July</b> and read by week. July does not begin on a Monday and does not end on a Sunday, so both ends land mid-week:
+        <br>&bull; The first point is the week commencing <b>29 June</b>, but it holds only <b>1&ndash;5 July</b>. 29 and 30 June are excluded by your <i>from</i> date.
+        <br>&bull; The last point is the week commencing <b>27 July</b>, but it holds only <b>27&ndash;31 July</b>. 1 and 2 August are excluded by your <i>to</i> date.
+        <br><br>
+        Both points hold five days rather than seven, so both sit lower than a full week &mdash; and if a large posting happened to fall on one of the excluded days, that point understates the week badly. The same happens by month whenever a range starts or ends part-way through one.
+        <br><br>
+        <b>To compare periods fairly</b>, start the range on a Monday and end it on a Sunday when reading by week, and use whole months when reading by month. The figures themselves are always right for the days in range &mdash; it is the comparison between points that a cut-short period distorts.</div>
+      </div>
+
+      <p class="fnote">The table below compares the three settings <b>for what you have selected right now</b>. The last column divides the busiest period by a typical one: the lower that figure, the steadier the line and the easier the trend is to read. The totals are there to show that all three settings account for exactly the same amount.</p>
+      <table class="gtab" id="gp-grainstats"></table>
+      <p class="fnote"><b>Table view</b>, at the top of this tile, lists the same figures as text at whichever setting is selected &mdash; period by period, with totals for each product group and each period &mdash; so nothing here can only be read off the chart.</p>
+    </footer>
+  </div><!-- /panel-gp -->
+
+  <footer id="notes-footer" hidden>
     <div id="mt-notes" class="flag" hidden></div>
   </footer>
 </div>
@@ -581,9 +1324,40 @@ const GROUPS = DATA.groups.slice();
 const classOf = {};
 GROUPS.forEach((g, i) => { classOf[g] = "c" + ((i % SLOTS.length) + 1); });
 
+/* Dimension lookups derived from the payload. Shared: the margin tab's pickers and the
+   trend tabs' dropdowns both read them, so they live here rather than inside either. */
+/* A value entry can carry no salesperson code. That is a real state, not a gap: those
+   rows are a quarter of revenue, so they get their own option rather than being dropped
+   from the list and made unreachable. */
+const SP_NONE = "";
+const spName = (code) => code === SP_NONE ? "No salesperson" : (DATA.salespeople[code] || code);
+
+/* Salesperson codes actually present in the data, most valuable first is decided later;
+   the unassigned bucket always sorts last in the list build below. */
+const SP_CODES = (() => {
+  const seen = new Set(DATA.rows.map((r) => r[3]));
+  const codes = Object.keys(DATA.salespeople || {}).filter((c) => seen.has(c));
+  if (seen.has(SP_NONE)) codes.push(SP_NONE);
+  return codes;
+})();
+
+/* Shortcut Dimension 3, shown as "Sector". BC currently returns it empty on every value
+   entry -- Dimension_Set_ID is 0 there, so no dimension set is attached at all -- which
+   leaves this a one-option list. The control hides itself below two options and will
+   appear on its own the day the dimension is populated in Business Central. */
+const SECTOR_NONE = "";
+const SECTORS = (() => {
+  const seen = new Set(DATA.rows.map((r) => r[4]));
+  const list = (DATA.sectors || []).filter((c) => seen.has(c));
+  if (seen.has(SECTOR_NONE)) list.push(SECTOR_NONE);
+  return list;
+})();
+const sectorName = (c) => c === SECTOR_NONE ? "No sector" : c;
+
+
 /* ---------- state ---------- */
 const state = {
-  from: DATA.minDate, to: DATA.maxDate, picked: new Set(),
+  from: DATA.minDate, to: DATA.maxDate, picked: new Set(), sp: new Set(), grp: new Set(),
   sort: "total:rev",  // "name", "total:<measure>", or "m:YYYY-MM:<measure>"
   dir: -1,
 };
@@ -596,6 +1370,7 @@ const SUBS = [
   { k: "cogs", short: "COGS", label: "Cost of sales", cell: (v) => compact(v), tot: (v) => num2(v), sign: false },
   { k: "gp",   short: "GP",   label: "Gross profit",  cell: (v) => compact(v), tot: (v) => num2(v), sign: true },
   { k: "gpm",  short: "GP %", label: "GP %",          cell: (v) => pct(v),     tot: (v) => pct(v),  sign: true },
+  { k: "ppmt", short: "S$/MT", label: "Price per MT",  cell: (v) => compact(v), tot: (v) => num2(v), sign: false },
 ];
 
 function monthLabel(ym) {
@@ -606,16 +1381,23 @@ function monthLabel(ym) {
 const $ = (id) => document.getElementById(id);
 
 /* ---------- filtered aggregation ---------- */
+/* Price per MT and GP % are DERIVED, never summed: each is worked out from the revenue
+   and tonnage of the cell it belongs to. Averaging a month's rates would let a tiny month
+   swing the total. Both guard their divisor -- a month can carry revenue with no tonnage
+   (a credit, say), and that must read 0.00 rather than Infinity or NaN. */
 const measures = (kg, r, c) =>
-  ({ mt: kg / 1000, rev: r, cogs: c, gp: r - c, gpm: r ? (r - c) / r : 0 });
+  ({ mt: kg / 1000, rev: r, cogs: c, gp: r - c, gpm: r ? (r - c) / r : 0,
+     ppmt: kg ? r / (kg / 1000) : 0 });
 
 function compute() {
   const byCust = new Map(), byGrpRev = new Map(), byGrpCog = new Map();
   const monthSet = new Set();
   let mt = 0, rev = 0, cogs = 0;
-  for (const [no, grp, date, kg, r, c] of DATA.rows) {
+  for (const [no, grp, date, sp, sector, kg, r, c] of DATA.rows) {
     if (date < state.from || date > state.to) continue;
     if (state.picked.size && !state.picked.has(no)) continue;
+    if (state.sp.size && !state.sp.has(sp)) continue;
+    if (state.grp.size && !state.grp.has(grp)) continue;
     const ym = date.slice(0, 7);
     monthSet.add(ym);
     let a = byCust.get(no);
@@ -891,7 +1673,8 @@ function renderTable(m) {
       foot.appendChild(td);
     });
   });
-  const grand = { mt: m.mt, rev: m.rev, cogs: m.cogs, gp: m.gp, gpm: m.rev ? m.gp / m.rev : 0 };
+  const grand = { mt: m.mt, rev: m.rev, cogs: m.cogs, gp: m.gp,
+                  gpm: m.rev ? m.gp / m.rev : 0, ppmt: m.mt ? m.rev / m.mt : 0 };
   SUBS.forEach((sb, i) => {
     const td = cell(grand, sb, i, "tot", sb.tot);
     attachCellTip(td, "All customers", null, grand);
@@ -921,6 +1704,7 @@ function attachCellTip(td, name, ym, v) {
     "Revenue  S$ " + num2(v.rev),
     "Cost of sales  S$ " + num2(v.cogs),
     "Gross profit  S$ " + num2(v.gp) + "  (" + pct(v.gpm) + ")",
+    "Price per MT  S$ " + num2(v.ppmt),
   ];
   const title = name + (ym ? " · " + monthLabel(ym) : " · all months");
   td.addEventListener("mouseenter", (ev) => showTip(ev, title, null, lines));
@@ -928,49 +1712,105 @@ function attachCellTip(td, name, ym, v) {
   td.addEventListener("mouseleave", hideTip);
 }
 
-/* ---------- customer picker ---------- */
-function renderOpts(m) {
-  const q = $("search").value.trim().toLowerCase();
-  const totals = new Map();
-  for (const [no, , date, , r] of DATA.rows) {
-    if (date < state.from || date > state.to) continue;
-    totals.set(no, (totals.get(no) || 0) + r);
-  }
-  const list = Object.keys(DATA.customers)
-    .map((no) => ({ no, name: DATA.customers[no], v: totals.get(no) || 0 }))
-    .filter((c) => !q || c.name.toLowerCase().includes(q) || c.no.toLowerCase().includes(q))
-    .sort((a, b) => b.v - a.v || a.name.localeCompare(b.name));
+/* ---------- pickers ----------
+   Two multi-select dropdowns share the panel markup, the option row and the open/close
+   wiring further down. Each one shows revenue per option computed under the OTHER
+   picker's selection and the current date range, so the figure beside a name says what
+   ticking it would actually contribute rather than what it is worth in isolation. */
 
-  const box = $("opts");
+/* Revenue per option under every filter EXCEPT the one being drawn. Excluding a picker
+   from its own totals is what keeps the numbers useful: filtered by itself, an unticked
+   option would always read zero. DIM is the row index -- 0 customer, 1 group, 3 salesperson. */
+function optionTotals(dim) {
+  const totals = new Map();
+  for (const row of DATA.rows) {
+    const date = row[2];
+    if (date < state.from || date > state.to) continue;
+    if (dim !== 0 && state.picked.size && !state.picked.has(row[0])) continue;
+    if (dim !== 1 && state.grp.size && !state.grp.has(row[1])) continue;
+    if (dim !== 3 && state.sp.size && !state.sp.has(row[3])) continue;
+    totals.set(row[dim], (totals.get(row[dim]) || 0) + row[6]);
+  }
+  return totals;
+}
+
+/* One option row builder for both panels. `set` is mutated in place rather than
+   reassigned, so the listeners registered here stay bound to the live selection. */
+function fillOpts(box, list, set, emptyMsg) {
   box.textContent = "";
   if (!list.length) {
-    box.innerHTML = '<p class="empty-opt">No customer matches that search.</p>';
+    const p = document.createElement("p");
+    p.className = "empty-opt";
+    p.textContent = emptyMsg;
+    box.appendChild(p);
     return;
   }
-  for (const c of list) {
+  for (const it of list) {
     const lab = document.createElement("label");
     lab.className = "opt";
-    lab.innerHTML = '<input type="checkbox"><span class="nm"></span><span class="vl"></span>';
+    lab.innerHTML = '<input type="checkbox">' + (it.cls ? '<span class="sw ' + it.cls + '"></span>' : "") +
+      '<span class="nm"></span><span class="vl"></span>';
     const cb = lab.querySelector("input");
-    cb.checked = state.picked.has(c.no);
-    lab.querySelector(".nm").textContent = c.name;
-    lab.querySelector(".vl").textContent = c.v ? compact(c.v) : "—";
+    cb.checked = set.has(it.k);
+    lab.querySelector(".nm").textContent = it.name;
+    lab.querySelector(".vl").textContent = it.v ? compact(it.v) : "—";
     cb.addEventListener("change", () => {
-      if (cb.checked) state.picked.add(c.no); else state.picked.delete(c.no);
+      if (cb.checked) set.add(it.k); else set.delete(it.k);
       render();
     });
     box.appendChild(lab);
   }
 }
 
+function renderOpts() {
+  const q = $("search").value.trim().toLowerCase();
+  const totals = optionTotals(0);
+  const list = Object.keys(DATA.customers)
+    .map((no) => ({ k: no, name: DATA.customers[no], v: totals.get(no) || 0 }))
+    .filter((c) => !q || c.name.toLowerCase().includes(q) || c.k.toLowerCase().includes(q))
+    .sort((a, b) => b.v - a.v || a.name.localeCompare(b.name));
+  fillOpts($("opts"), list, state.picked, "No customer matches that search.");
+}
+
+function renderSpOpts() {
+  const totals = optionTotals(3);
+  const list = SP_CODES
+    .map((c) => ({ k: c, name: spName(c), v: totals.get(c) || 0 }))
+    // Unassigned last whatever its value: it is a residue, not a person.
+    .sort((a, b) => (a.k === SP_NONE) - (b.k === SP_NONE) || b.v - a.v || a.name.localeCompare(b.name));
+  fillOpts($("spopts"), list, state.sp, "No salesperson in this data.");
+}
+
+/* Product groups keep their fixed palette slot here, so a swatch in this list is the same
+   colour as that group's bar. Listed in the fixed group order rather than by value, which
+   is the order the charts use and the pairing the palette was validated on. */
+function renderGpOpts() {
+  const totals = optionTotals(1);
+  const list = DATA.groups.map((g) => ({ k: g, name: g, v: totals.get(g) || 0, cls: classOf[g] }));
+  fillOpts($("gpopts"), list, state.grp, "No product group in this data.");
+}
+
 function renderPickLabel() {
   const n = state.picked.size;
-  const btn = $("pick");
-  btn.classList.toggle("on", n > 0);
+  $("pick").classList.toggle("on", n > 0);
   $("picklabel").textContent = n === 0
     ? "All customers"
     : n === 1 ? (DATA.customers[[...state.picked][0]] || "1 selected")
     : n + " customers selected";
+
+  const sn = state.sp.size;
+  $("spick").classList.toggle("on", sn > 0);
+  $("spicklabel").textContent = sn === 0
+    ? "All salespeople"
+    : sn === 1 ? spName([...state.sp][0])
+    : sn + " salespeople selected";
+
+  const gn = state.grp.size;
+  $("gpick").classList.toggle("on", gn > 0);
+  $("gpicklabel").textContent = gn === 0
+    ? "All product groups"
+    : gn === 1 ? [...state.grp][0]
+    : gn + " product groups selected";
 }
 
 /* ---------- presets ---------- */
@@ -1005,6 +1845,768 @@ function syncPresets() {
   });
 }
 
+/* ---------- trend tabs ----------
+   ONE implementation, instantiated per measure. MT trend and Revenue trend differ only in
+   which column of a row they read and how a figure is written, so everything else -- the
+   grain machinery, the plot, the crosshair, the legend, the table twin, the slicers -- is
+   shared. Adding a third measure is another entry in TRENDS plus a panel in the markup;
+   it is never a copy of this block.
+
+   Each instance keeps its own date range, grain and product-group selection in `st`, and
+   owns the DOM ids prefixed with `cfg.p`. They are deliberately independent of each other
+   and of the margin tab: a tab answers one question and its filters say so on its face.
+
+   GRAIN IS THE DIFFERENCE between a trend and a heart monitor. Deliveries arrive in lumps,
+   so plotted per posting date the line is spikes against a flat floor -- the busiest day
+   runs well over a hundred times the median. Monthly is close to even, which is why it is
+   the default. Nothing is smoothed: every grain sums the same rows. */
+
+/* Monday of the ISO week containing iso. */
+function weekStart(iso) {
+  const [y, m, d] = iso.split("-").map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d));
+  t.setUTCDate(t.getUTCDate() - ((t.getUTCDay() + 6) % 7));
+  return t.toISOString().slice(0, 10);
+}
+function monthEnd(ym) {
+  const [y, m] = ym.split("-").map(Number);
+  return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+}
+const shortMonth = (iso) => {
+  const [y, m] = iso.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString("en-GB", { month: "short", timeZone: "UTC" });
+};
+
+/* Each grain maps a posting date to a bucket key, and a key back to the span it covers.
+   `end` is what tells us a bucket is only partly filled. */
+const GRAINS = {
+  day: {
+    label: "Day", key: (iso) => iso, start: (k) => k, end: (k) => k,
+    tip: (k) => niceDate(k), col: "Posting date",
+  },
+  week: {
+    label: "Week", key: weekStart, start: (k) => k, end: (k) => shiftDays(k, 6),
+    tip: (k) => "Week of " + niceDate(k), col: "Week commencing",
+  },
+  month: {
+    label: "Month", key: (iso) => iso.slice(0, 7), start: (k) => k + "-01", end: monthEnd,
+    tip: (k) => monthLabel(k), col: "Month",
+  },
+};
+
+const SVGNS = "http://www.w3.org/2000/svg";
+/* A sprite reference. Built through the SVG namespace, not innerHTML, so the <use> is a
+   real SVG element rather than an inert HTML one that silently renders nothing. */
+function icon12(name) {
+  const svg = document.createElementNS(SVGNS, "svg");
+  svg.setAttribute("class", "ic");
+  svg.setAttribute("aria-hidden", "true");
+  const use = document.createElementNS(SVGNS, "use");
+  use.setAttribute("href", "#" + name);
+  svg.appendChild(use);
+  return svg;
+}
+const svgEl = (name, attrs) => {
+  const n = document.createElementNS(SVGNS, name);
+  for (const k in attrs) n.setAttribute(k, attrs[k]);
+  return n;
+};
+
+/* Plot box. The 36px bottom band is inside the viewBox, so the date labels belong to the
+   figure rather than being clipped by it or forcing a nested scrollbar. */
+const TP = { w: 960, h: 380, l: 64, r: 16, t: 12, b: 36 };
+TP.iw = TP.w - TP.l - TP.r;
+TP.ih = TP.h - TP.t - TP.b;
+
+/* A round number at or above the peak, so the top gridline is readable. */
+function niceMax(v) {
+  if (!(v > 0)) return 1;
+  const step = Math.pow(10, Math.floor(Math.log10(v)));
+  const m = v / step;
+  return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * step;
+}
+
+function createTrend(cfg) {
+  const id = (suffix) => cfg.p + "-" + suffix;
+  const st = {
+    from: DATA.minDate, to: DATA.maxDate,
+    groups: new Set(DATA.groups), customers: new Set(), grain: "month", view: "chart",
+  };
+  /* Optional extra dimensions, declared per measure. Each gets its own Set, its own
+     dropdown and its own pill; a further one is another entry in cfg.dims. */
+  const DIMS = cfg.dims || [];
+  for (const d of DIMS) st[d.key] = new Set();
+
+  /* Value per period per group. A period a group did not trade in is a real zero, not a
+     gap, so the line stays continuous and two groups can be read against each other over
+     the same span. The y scale follows the SELECTED groups, which is what makes the slicer
+     worth having: one group dominates each measure, and with it shown the rest are flat. */
+  function data() {
+    const G = GRAINS[st.grain];
+    const keys = new Set(), byGrp = new Map();
+    for (const row of DATA.rows) {
+      const date = row[2];
+      if (date < st.from || date > st.to) continue;
+      const k = G.key(date);
+      keys.add(k);
+      if (st.customers.size && !st.customers.has(row[0])) continue;
+      let skip = false;
+      for (const dm of DIMS) {
+        if (st[dm.key].size && !st[dm.key].has(row[dm.idx])) { skip = true; break; }
+      }
+      if (skip) continue;
+      const grp = row[1];
+      if (!st.groups.has(grp)) continue;
+      let m = byGrp.get(grp);
+      if (!m) { m = new Map(); byGrp.set(grp, m); }
+      m.set(k, (m.get(k) || 0) + cfg.value(row));
+    }
+    const periods = Array.from(keys).sort();
+    // Fixed group order, never by value: legend, chips and lines must agree with the bars.
+    const series = DATA.groups.filter((g) => st.groups.has(g)).map((g) => {
+      const m = byGrp.get(g) || new Map();
+      const pts = periods.map((k) => m.get(k) || 0);
+      return { g, cls: classOf[g], pts, total: pts.reduce((a, b) => a + b, 0) };
+    });
+    const max = series.reduce((a, s) => Math.max(a, ...s.pts), 0);
+    const min = series.reduce((a, s) => Math.min(a, ...s.pts), 0);
+    /* A trailing bucket the data does not yet fill would otherwise read as a collapse: at
+       a monthly grain, three days of a new month plot as a near-zero point after a full
+       one. Flagged, not hidden -- drawn hollow and called out in the hint. */
+    const last = periods[periods.length - 1];
+    const partial = periods.length > 1 && last !== undefined && G.end(last) > DATA.maxDate;
+    return { periods, series, max, min, partial, G };
+  }
+
+  function render() {
+    const d = data();
+    const G = d.G;
+    const svg = $(id("svg"));
+    // Keep the <title>/<desc> that aria-labelledby points at; clear only the marks.
+    for (const n of Array.from(svg.childNodes)) {
+      if (n.nodeType !== 1 || (n.tagName !== "title" && n.tagName !== "desc")) n.remove();
+    }
+
+    const grand = d.series.reduce((a, s) => a + s.total, 0);
+    $(id("hint")).textContent =
+      cfg.noun + " per " + G.label.toLowerCase() + ", one line per general product posting group · " +
+      niceDate(st.from) + " – " + niceDate(st.to) + " · " +
+      d.series.length + " of " + DATA.groups.length + " groups" +
+      (st.customers.size ? " · " + st.customers.size + " customer" +
+        (st.customers.size > 1 ? "s" : "") : "") +
+      " · " + cfg.full(grand) + " total" +
+      (d.partial ? " · last point is a part-period and is drawn hollow" : "");
+
+    renderLegend(d);
+    renderTable(d);
+    renderGrainStats();
+    if (!$(id("panel")).hidden) renderCustOpts();
+    for (const dm of DIMS) if (!$(id(dm.key + "panel")).hidden) renderDimOpts(dm);
+
+    if (!d.periods.length || !d.series.length) {
+      const t = svgEl("text", { class: "tempty", x: TP.w / 2, y: TP.h / 2 });
+      t.textContent = !d.series.length ? "No product group selected." : "No postings in this range.";
+      svg.appendChild(t);
+      return;
+    }
+
+    const xs = d.periods.map((k) => Date.parse(G.start(k)));
+    const t0 = xs[0], t1 = xs[xs.length - 1];
+    const span = t1 - t0 || 1;
+    const yMax = niceMax(d.max);
+    /* The scale must open downwards. Both measures go negative when a credit memo lands,
+       and anchored at zero such a point falls below the plot box, where `overflow: visible`
+       draws it across the date labels. */
+    const yMin = d.min < 0 ? -niceMax(-d.min) : 0;
+    const yRange = (yMax - yMin) || 1;
+    const x = (i) => d.periods.length === 1 ? TP.l + TP.iw / 2 : TP.l + (xs[i] - t0) / span * TP.iw;
+    const y = (v) => TP.t + TP.ih - (v - yMin) / yRange * TP.ih;
+
+    // Gridlines are solid hairlines one shade off the surface. Never dashed.
+    for (let i = 0; i <= 4; i++) {
+      const v = yMin + yRange * i / 4, yy = y(v);
+      svg.appendChild(svgEl("line", { class: "tgrid", x1: TP.l, x2: TP.l + TP.iw, y1: yy, y2: yy }));
+      const lab = svgEl("text", { class: "tlabel y", x: TP.l - 9, y: yy + 4 });
+      lab.textContent = cfg.tick(v);
+      svg.appendChild(lab);
+    }
+    const unit = svgEl("text", { class: "tlabel y", x: TP.l - 9, y: TP.t - 1 });
+    unit.textContent = cfg.axis;
+    svg.appendChild(unit);
+    const zero = y(0);
+    svg.appendChild(svgEl("line", { class: "taxis", x1: TP.l, x2: TP.l + TP.iw, y1: zero, y2: zero }));
+
+    /* Few points: tick every one. Many: one tick per calendar month, or labels collide. */
+    const everyPoint = d.periods.length <= 12;
+    const seen = new Set();
+    d.periods.forEach((k, i) => {
+      const iso = G.start(k), ym = iso.slice(0, 7);
+      if (!everyPoint) {
+        if (seen.has(ym)) return;
+        seen.add(ym);
+      }
+      const xx = x(i);
+      svg.appendChild(svgEl("line", { class: "tgrid", x1: xx, x2: xx, y1: TP.t, y2: TP.t + TP.ih }));
+      const lab = svgEl("text", { class: "tlabel x", x: xx, y: TP.h - 12 });
+      lab.textContent = st.grain === "week" && everyPoint
+        ? Number(iso.slice(8, 10)) + " " + shortMonth(iso)
+        : shortMonth(iso);
+      svg.appendChild(lab);
+    });
+
+    for (const s of d.series) {
+      const dd = d.periods
+        .map((k, i) => (i ? "L" : "M") + x(i).toFixed(2) + " " + y(s.pts[i]).toFixed(2))
+        .join(" ");
+      svg.appendChild(svgEl("path", { class: "tline " + s.cls, d: dd }));
+    }
+
+    /* At a coarse grain the line is only a handful of points, and a bare polyline reads as
+       an estimate. Mark each observation -- and draw a part-period one hollow. */
+    if (d.periods.length <= 40) {
+      for (const s of d.series) {
+        d.periods.forEach((k, i) => {
+          const isPartial = d.partial && i === d.periods.length - 1;
+          svg.appendChild(svgEl("circle", {
+            class: "tdot " + s.cls + (isPartial ? " partial" : ""),
+            r: 3.5, cx: x(i), cy: y(s.pts[i]),
+          }));
+        });
+      }
+    }
+
+    // Crosshair over the whole plot, so there is no pinpoint target.
+    const cross = svgEl("line", { class: "tcross", y1: TP.t, y2: TP.t + TP.ih, x1: 0, x2: 0 });
+    cross.style.display = "none";
+    svg.appendChild(cross);
+    const dots = d.series.map((s) => {
+      const c = svgEl("circle", { class: "tdot hov " + s.cls, r: 5, cx: 0, cy: 0 });
+      c.style.display = "none";
+      svg.appendChild(c);
+      return c;
+    });
+    const hit = svgEl("rect", { x: TP.l, y: TP.t, width: TP.iw, height: TP.ih, fill: "transparent" });
+    svg.appendChild(hit);
+
+    const nearest = (ev) => {
+      const box = svg.getBoundingClientRect();
+      const px = (ev.clientX - box.left) / box.width * TP.w;
+      let best = 0, bd = Infinity;
+      d.periods.forEach((k, i) => {
+        const dx = Math.abs(x(i) - px);
+        if (dx < bd) { bd = dx; best = i; }
+      });
+      return best;
+    };
+    hit.addEventListener("mouseenter", () => {
+      cross.style.display = "";
+      dots.forEach((c) => { c.style.display = ""; });
+    });
+    hit.addEventListener("mousemove", (ev) => {
+      const i = nearest(ev), xx = x(i);
+      cross.setAttribute("x1", xx);
+      cross.setAttribute("x2", xx);
+      d.series.forEach((s, k) => {
+        dots[k].setAttribute("cx", xx);
+        dots[k].setAttribute("cy", y(s.pts[i]));
+      });
+      const lines = d.series
+        .map((s) => ({ g: s.g, v: s.pts[i] }))
+        .sort((a, b) => b.v - a.v)
+        .map((o) => o.g + "  " + cfg.full(o.v));
+      lines.push("Total  " + cfg.full(d.series.reduce((a, s) => a + s.pts[i], 0)));
+      if (d.partial && i === d.periods.length - 1) lines.push("Part period — still filling");
+      showTip(ev, G.tip(d.periods[i]), null, lines);
+      moveTip(ev);
+    });
+    hit.addEventListener("mouseleave", () => {
+      cross.style.display = "none";
+      dots.forEach((c) => { c.style.display = "none"; });
+      hideTip();
+    });
+  }
+
+  /* Value per customer under this tab's OTHER filters -- date range and product groups,
+     but not the customer selection itself. A picker included in its own totals would show
+     zero against every unticked name, which is the opposite of what someone opening the
+     list wants to know. */
+  function custTotals() {
+    const totals = new Map();
+    for (const row of DATA.rows) {
+      const date = row[2];
+      if (date < st.from || date > st.to) continue;
+      if (!st.groups.has(row[1])) continue;
+      let skip = false;
+      for (const dm of DIMS) {
+        if (st[dm.key].size && !st[dm.key].has(row[dm.idx])) { skip = true; break; }
+      }
+      if (skip) continue;
+      totals.set(row[0], (totals.get(row[0]) || 0) + cfg.value(row));
+    }
+    return totals;
+  }
+
+  function renderCustOpts() {
+    const q = $(id("search")).value.trim().toLowerCase();
+    const totals = custTotals();
+    const list = Object.keys(DATA.customers)
+      .map((no) => ({ no, name: DATA.customers[no], v: totals.get(no) || 0 }))
+      .filter((c) => !q || c.name.toLowerCase().includes(q) || c.no.toLowerCase().includes(q))
+      .sort((a, b) => b.v - a.v || a.name.localeCompare(b.name));
+
+    const box = $(id("opts"));
+    box.textContent = "";
+    if (!list.length) {
+      const p = document.createElement("p");
+      p.className = "empty-opt";
+      p.textContent = "No customer matches that search.";
+      box.appendChild(p);
+      return;
+    }
+    for (const c of list) {
+      const lab = document.createElement("label");
+      lab.className = "opt";
+      lab.innerHTML = '<input type="checkbox"><span class="nm"></span><span class="vl"></span>';
+      const cb = lab.querySelector("input");
+      cb.checked = st.customers.has(c.no);
+      lab.querySelector(".nm").textContent = c.name;
+      lab.querySelector(".vl").textContent = c.v ? cfg.brief(c.v) : "—";
+      // Mutate the Set rather than replacing it: these listeners are bound to the object.
+      cb.addEventListener("change", () => {
+        if (cb.checked) st.customers.add(c.no); else st.customers.delete(c.no);
+        render();
+        sync();
+      });
+      box.appendChild(lab);
+    }
+  }
+
+  /* One option list per extra dimension. Short lists, so no search box: just the options,
+     each with its value under the tab's other filters, and Select all / Clear. */
+  function dimTotals(dm) {
+    const totals = new Map();
+    for (const row of DATA.rows) {
+      const date = row[2];
+      if (date < st.from || date > st.to) continue;
+      if (!st.groups.has(row[1])) continue;
+      if (st.customers.size && !st.customers.has(row[0])) continue;
+      let skip = false;
+      for (const other of DIMS) {
+        if (other === dm) continue;              // a dimension never filters its own list
+        if (st[other.key].size && !st[other.key].has(row[other.idx])) { skip = true; break; }
+      }
+      if (skip) continue;
+      totals.set(row[dm.idx], (totals.get(row[dm.idx]) || 0) + cfg.value(row));
+    }
+    return totals;
+  }
+
+  function renderDimOpts(dm) {
+    const totals = dimTotals(dm);
+    const box = $(id(dm.key + "opts"));
+    box.textContent = "";
+    for (const code of dm.options()) {
+      const lab = document.createElement("label");
+      lab.className = "opt";
+      lab.innerHTML = '<input type="checkbox"><span class="nm"></span><span class="vl"></span>';
+      const cb = lab.querySelector("input");
+      cb.checked = st[dm.key].has(code);
+      lab.querySelector(".nm").textContent = dm.name(code);
+      const v = totals.get(code) || 0;
+      lab.querySelector(".vl").textContent = v ? cfg.brief(v) : "—";
+      cb.addEventListener("change", () => {
+        if (cb.checked) st[dm.key].add(code); else st[dm.key].delete(code);
+        render();
+        sync();
+      });
+      box.appendChild(lab);
+    }
+  }
+
+  /* Seven series, so a legend rather than direct labels: a number on every point would be
+     unreadable, and the table view carries the exact figures. */
+  function renderLegend(d) {
+    const host = $(id("legend"));
+    host.textContent = "";
+    for (const s of d.series) {
+      const row = document.createElement("span");
+      row.className = "lg";
+      row.innerHTML = '<span class="sw ' + s.cls + '"></span><span class="ln"></span><span class="lv"></span>';
+      row.querySelector(".ln").textContent = s.g;
+      row.querySelector(".lv").textContent = cfg.full(s.total);
+      host.appendChild(row);
+    }
+  }
+
+  /* The table twin. Required outright by the accessibility pass, and it is also the relief
+     the palette validator demands: three of the seven hues fall under 3:1 against the light
+     card, so no value may be reachable through colour or hover alone. */
+  function renderTable(d) {
+    const cell = (tr, text, cls, head) => {
+      const c = document.createElement(head ? "th" : "td");
+      c.textContent = text;
+      if (cls) c.className = cls;
+      if (head) c.scope = "col";
+      tr.appendChild(c);
+      return c;
+    };
+
+    const th = document.createElement("tr");
+    cell(th, d.G.col, "", true);
+    for (const s of d.series) cell(th, s.g, "n", true);
+    cell(th, "Total", "n", true);
+    $(id("thead")).textContent = "";
+    $(id("thead")).appendChild(th);
+
+    const tb = $(id("tbody"));
+    tb.textContent = "";
+    if (!d.periods.length || !d.series.length) {
+      const tr = document.createElement("tr");
+      const td = cell(tr, !d.series.length ? "No product group selected." : "No postings in this range.", "no-rows");
+      td.colSpan = d.series.length + 2;
+      tb.appendChild(tr);
+    }
+    d.periods.forEach((k, i) => {
+      const tr = document.createElement("tr");
+      const isPartial = d.partial && i === d.periods.length - 1;
+      cell(tr, d.G.tip(k) + (isPartial ? " (part period)" : ""), "name");
+      let tot = 0;
+      for (const s of d.series) { tot += s.pts[i]; cell(tr, num2(s.pts[i]), "n"); }
+      cell(tr, num2(tot), "n tot");
+      tb.appendChild(tr);
+    });
+
+    const tf = document.createElement("tr");
+    const word = d.G.label.toLowerCase();
+    cell(tf, "Total — " + d.periods.length + " " + word + (d.periods.length === 1 ? "" : "s"), "name");
+    let grand = 0;
+    for (const s of d.series) { grand += s.total; cell(tf, num2(s.total), "n"); }
+    cell(tf, num2(grand), "n tot");
+    $(id("tfoot")).textContent = "";
+    $(id("tfoot")).appendChild(tf);
+  }
+
+  /* The footer's claim that the grains agree, and that the coarse ones read as a trend, is
+     computed from whatever is selected rather than written into the prose as a number that
+     would rot the first time BC posted. */
+  function renderGrainStats() {
+    const host = $(id("grainstats"));
+    if (!host) return;
+    const saved = st.grain;
+    const stats = ["day", "week", "month"].map((g) => {
+      st.grain = g;
+      const d = data();
+      const per = d.periods.map((k, i) => d.series.reduce((a, s) => a + s.pts[i], 0));
+      const sorted = per.slice().sort((a, b) => a - b);
+      const med = sorted[Math.floor(sorted.length / 2)] || 0;
+      return {
+        key: g, label: GRAINS[g].label, pts: d.periods.length,
+        total: d.series.reduce((a, s) => a + s.total, 0),
+        ratio: med > 0 && per.length ? Math.max(...per) / med : 0,
+      };
+    });
+    st.grain = saved;
+
+    host.textContent = "";
+    const head = document.createElement("tr");
+    for (const h of ["Grain", "Points", cfg.totalCol, "Busiest ÷ typical period"]) {
+      const th = document.createElement("th");
+      th.scope = "col";
+      th.textContent = h;
+      head.appendChild(th);
+    }
+    const thead = document.createElement("thead");
+    thead.appendChild(head);
+    host.appendChild(thead);
+
+    const tbody = document.createElement("tbody");
+    for (const s of stats) {
+      const tr = document.createElement("tr");
+      if (s.key === saved) tr.className = "on";
+      const name = document.createElement("td");
+      name.textContent = s.label;
+      if (s.key === saved) {
+        const tag = document.createElement("span");
+        tag.className = "now";
+        tag.textContent = "selected";
+        name.appendChild(tag);
+      }
+      tr.appendChild(name);
+      for (const v of [f0.format(s.pts), num2(s.total),
+                       s.ratio ? s.ratio.toFixed(1) + "×" : "—"]) {
+        const td = document.createElement("td");
+        td.textContent = v;
+        tr.appendChild(td);
+      }
+      tbody.appendChild(tr);
+    }
+    host.appendChild(tbody);
+  }
+
+  function build() {
+    const host = $(id("presets"));
+    for (const pr of PRESETS) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "chip";
+      b.textContent = pr.label;
+      b.dataset.id = pr.id;
+      b.addEventListener("click", () => {
+        st.from = pr.from();
+        st.to = DATA.maxDate;
+        render();
+        sync();
+      });
+      host.appendChild(b);
+    }
+
+    const grh = $(id("grain"));
+    for (const key of ["day", "week", "month"]) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "chip";
+      b.textContent = GRAINS[key].label;
+      b.dataset.grain = key;
+      b.addEventListener("click", () => { st.grain = key; render(); sync(); });
+      grh.appendChild(b);
+    }
+
+    const gh = $(id("groups"));
+    for (const g of DATA.groups) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "chip";
+      b.dataset.g = g;
+      b.innerHTML = '<span class="sw ' + classOf[g] + '"></span><span class="gn"></span>';
+      b.querySelector(".gn").textContent = g;
+      b.addEventListener("click", () => {
+        if (st.groups.has(g)) st.groups.delete(g); else st.groups.add(g);
+        render();
+        sync();
+      });
+      gh.appendChild(b);
+    }
+
+    for (const inp of [$(id("from")), $(id("to"))]) { inp.min = DATA.minDate; inp.max = DATA.maxDate; }
+    const onDate = () => {
+      st.from = $(id("from")).value || DATA.minDate;
+      st.to = $(id("to")).value || DATA.maxDate;
+      if (st.from > st.to) { const t = st.from; st.from = st.to; st.to = t; }
+      render();
+      sync();
+    };
+    $(id("from")).addEventListener("change", onDate);
+    $(id("to")).addEventListener("change", onDate);
+
+    const setView = (v) => {
+      st.view = v;
+      $(id("chartview")).hidden = v !== "chart";
+      $(id("tableview")).hidden = v !== "table";
+      $(id("chart")).setAttribute("aria-pressed", String(v === "chart"));
+      $(id("table")).setAttribute("aria-pressed", String(v === "table"));
+    };
+    $(id("chart")).addEventListener("click", () => setView("chart"));
+    $(id("table")).addEventListener("click", () => setView("table"));
+
+    $(id("search")).addEventListener("input", () => renderCustOpts());
+    $(id("selall")).addEventListener("click", () => {
+      for (const no of Object.keys(DATA.customers)) st.customers.add(no);
+      render();
+      sync();
+    });
+    $(id("selnone")).addEventListener("click", () => { st.customers.clear(); render(); sync(); });
+
+    for (const dm of DIMS) {
+      $(id(dm.key + "selall")).addEventListener("click", () => {
+        for (const c of dm.options()) st[dm.key].add(c);
+        render();
+        sync();
+      });
+      $(id(dm.key + "selnone")).addEventListener("click", () => {
+        st[dm.key].clear();
+        render();
+        sync();
+      });
+      // A control that cannot narrow anything invites a click and does nothing.
+      if (dm.options().length < 2) $(id(dm.key + "pick")).closest(".field").hidden = true;
+    }
+
+    $(id("reset")).addEventListener("click", () => {
+      st.from = DATA.minDate;
+      st.to = DATA.maxDate;
+      st.grain = "month";
+      st.groups = new Set(DATA.groups);
+      st.customers.clear();          // mutate: the option listeners hold this object
+      for (const dm of DIMS) st[dm.key].clear();
+      $(id("search")).value = "";
+      render();
+      sync();
+    });
+  }
+
+  /* One pill per dimension, lit when it is narrowing the view. Whole-range, all-groups and
+     no-customer states are the defaults and stay unlit, so anything highlighted is a
+     deliberate restriction the reader has applied. */
+  function renderActive() {
+    const host = $(id("active"));
+    if (!host) return;
+    host.textContent = "";
+    const lead = document.createElement("span");
+    lead.className = "lead";
+    lead.appendChild(icon12("ic-funnel"));
+    lead.appendChild(document.createTextNode("Showing"));
+    host.appendChild(lead);
+
+    const wholeRange = st.from === DATA.minDate && st.to === DATA.maxDate;
+    const allGroups = st.groups.size === DATA.groups.length;
+    const pills = [
+      ["ic-cal", "Dates", wholeRange ? "all dates" : niceDate(st.from) + " – " + niceDate(st.to), !wholeRange],
+      ["ic-layers", "Grain", GRAINS[st.grain].label, false],
+      ["ic-grid", "Groups", allGroups ? "all " + DATA.groups.length
+        : st.groups.size === 1 ? [...st.groups][0]
+        : st.groups.size + " of " + DATA.groups.length, !allGroups],
+      ["ic-user", "Customers", st.customers.size === 0 ? "all"
+        : st.customers.size === 1 ? (DATA.customers[[...st.customers][0]] || "1 selected")
+        : st.customers.size + " selected", st.customers.size > 0],
+    ];
+    for (const dm of DIMS) {
+      if (dm.options().length < 2) continue;     // hidden control, no pill
+      const c = st[dm.key].size;
+      pills.push([dm.icon, dm.label, c === 0 ? "all"
+        : c === 1 ? dm.name([...st[dm.key]][0]) : c + " selected", c > 0]);
+    }
+    for (const [icon, label, value, on] of pills) {
+      const el = document.createElement("span");
+      el.className = "pill" + (on ? " on" : "");
+      el.appendChild(icon12(icon));
+      const i = document.createElement("i");
+      i.textContent = label;
+      el.appendChild(i);
+      el.appendChild(document.createTextNode(value));
+      host.appendChild(el);
+    }
+    /* Reset arms only when something is narrowing. A button that always looks live is a
+       button nobody reads. Grain is excluded: month is a way of looking, not a filter. */
+    $(id("reset")).classList.toggle("armed",
+      !wholeRange || !allGroups || st.customers.size > 0 ||
+      DIMS.some((dm) => st[dm.key].size > 0));
+  }
+
+  function sync() {
+    $(id("from")).value = st.from;
+    $(id("to")).value = st.to;
+    const n = st.customers.size;
+    $(id("pick")).classList.toggle("on", n > 0);
+    $(id("picklabel")).textContent = n === 0
+      ? "All customers"
+      : n === 1 ? (DATA.customers[[...st.customers][0]] || "1 selected")
+      : n + " customers selected";
+
+    for (const dm of DIMS) {
+      const c = st[dm.key].size;
+      $(id(dm.key + "pick")).classList.toggle("on", c > 0);
+      $(id(dm.key + "label")).textContent = c === 0 ? dm.all
+        : c === 1 ? dm.name([...st[dm.key]][0])
+        : c + " selected";
+    }
+    document.querySelectorAll("#" + id("presets") + " .chip").forEach((b) => {
+      const pr = PRESETS.find((x) => x.id === b.dataset.id);
+      b.setAttribute("aria-pressed", String(st.to === DATA.maxDate && st.from === pr.from()));
+    });
+    document.querySelectorAll("#" + id("grain") + " .chip").forEach((b) => {
+      b.setAttribute("aria-pressed", String(st.grain === b.dataset.grain));
+    });
+    document.querySelectorAll("#" + id("groups") + " .chip").forEach((b) => {
+      b.setAttribute("aria-pressed", String(st.groups.has(b.dataset.g)));
+    });
+    renderActive();
+  }
+
+  /* The open/close behaviour belongs to the one PANELS registry in the wiring section,
+     so a click outside any dropdown on any tab behaves the same. */
+  const panels = [{
+    btn: id("pick"), panel: id("panel"),
+    onOpen: () => { renderCustOpts(); $(id("search")).focus(); },
+  }];
+  for (const dm of DIMS) {
+    panels.push({
+      btn: id(dm.key + "pick"), panel: id(dm.key + "panel"),
+      onOpen: () => renderDimOpts(dm),
+    });
+  }
+
+  return { cfg, st, data, render, build, sync, panels };
+}
+
+/* Row shape is [customer, group, date, salesperson, kg, revenue, cost]. Tonnage is stored
+   in kilograms; revenue is already display-positive Singapore dollars. */
+const TRENDS = {
+  mt: createTrend({
+    p: "tr", noun: "Tonnage shipped", axis: "MT", totalCol: "Total MT",
+    value: (r) => r[5] / 1000,
+    full: (v) => num2(v) + " MT",
+    brief: (v) => compact(v) + " MT",
+    tick: (v) => Math.abs(v) >= 1000 ? compact(v) : f0.format(v),
+  }),
+  /* Revenue carries two extra dimensions the other tabs do not: who sold it, and the
+     sector it was booked to. Sector is Shortcut Dimension 3 and is empty in BC today, so
+     its control stays hidden until the dimension is populated. */
+  rev: createTrend({
+    p: "rv", noun: "Revenue", axis: "S$", totalCol: "Total revenue",
+    dims: [
+      { key: "sp", idx: 3, label: "Salesperson", icon: "ic-badge", all: "All salespeople",
+        options: () => SP_CODES, name: spName },
+      { key: "sector", idx: 4, label: "Sector", icon: "ic-tag", all: "All sectors",
+        options: () => SECTORS, name: sectorName },
+    ],
+    value: (r) => r[6],
+    full: (v) => "S$ " + num2(v),
+    brief: (v) => "S$ " + compact(v),
+    tick: (v) => Math.abs(v) >= 1000 ? compact(v) : f0.format(v),
+  }),
+  /* Gross profit is derived per row, not a stored column: revenue less cost of sales.
+     It is the measure most often BELOW zero -- whole product groups sell under cost --
+     which is why the scale opening downwards and the zero line matter most here. */
+  gp: createTrend({
+    p: "gp", noun: "Gross profit", axis: "S$", totalCol: "Total gross profit",
+    value: (r) => r[6] - r[7],
+    full: (v) => "S$ " + num2(v),
+    brief: (v) => "S$ " + compact(v),
+    tick: (v) => Math.abs(v) >= 1000 ? compact(v) : f0.format(v),
+  }),
+};
+
+/* ---------- tabs ---------- */
+const TABS = [
+  ["tab-margin", "panel-margin", null],
+  ["tab-trend", "panel-trend", "mt"],
+  ["tab-rev", "panel-rev", "rev"],
+  ["tab-gp", "panel-gp", "gp"],
+];
+function selectTab(id) {
+  for (const [t, panel] of TABS) {
+    const on = t === id;
+    $(t).setAttribute("aria-selected", String(on));
+    $(t).tabIndex = on ? 0 : -1;
+    $(panel).hidden = !on;
+  }
+  // The plots lay out from a viewBox, so they draw correctly even from a hidden panel;
+  // redrawing on activation just keeps them current with the slicers.
+  const which = (TABS.find(([t]) => t === id) || [])[2];
+  if (which) TRENDS[which].render();
+}
+for (const [t] of TABS) {
+  $(t).addEventListener("click", () => selectTab(t));
+  $(t).addEventListener("keydown", (e) => {
+    const i = TABS.findIndex(([x]) => x === t);
+    const next = e.key === "ArrowRight" ? i + 1 : e.key === "ArrowLeft" ? i - 1 : -1;
+    if (next < 0 || next >= TABS.length) return;
+    e.preventDefault();
+    selectTab(TABS[next][0]);
+    $(TABS[next][0]).focus();
+  });
+}
+
 /* ---------- render ---------- */
 function render() {
   if (state.from > state.to) { const t = state.from; state.from = state.to; state.to = t; }
@@ -1018,11 +2620,15 @@ function render() {
   renderTable(m);
   renderPickLabel();
   syncPresets();
-  if (!$("panel").hidden) renderOpts(m);
+  if (!$("panel").hidden) renderOpts();
+  if (!$("sppanel").hidden) renderSpOpts();
+  if (!$("gppanel").hidden) renderGpOpts();
   $("tbl-hint").textContent =
-    "MT, revenue, cost of sales, gross profit and GP % for every month · " +
+    "MT, revenue, cost of sales, gross profit, GP % and price per MT for every month · " +
     niceDate(state.from) + " – " + niceDate(state.to) +
     (state.picked.size ? " · " + state.picked.size + " customer filter" + (state.picked.size > 1 ? "s" : "") : "") +
+    (state.sp.size ? " · " + state.sp.size + " salesperson filter" + (state.sp.size > 1 ? "s" : "") : "") +
+    (state.grp.size ? " · " + state.grp.size + " product group filter" + (state.grp.size > 1 ? "s" : "") : "") +
     " · amounts in S$, hover a cell for full precision";
 }
 
@@ -1051,6 +2657,10 @@ function render() {
   }
   el.innerHTML = parts.map((p) => "<div>" + p + "</div>").join("");
   el.hidden = false;
+  // The flag sits in a footer of its own now, outside both tabs, since a missing kg
+  // conversion understates tonnage on either. Un-hide that card with it, or an empty
+  // panel is drawn under every tab.
+  $("notes-footer").hidden = false;
 })();
 
 $("co").textContent = DATA.company;
@@ -1084,32 +2694,75 @@ for (const el of [$("from"), $("to")]) { el.min = DATA.minDate; el.max = DATA.ma
 $("from").addEventListener("change", (e) => { state.from = e.target.value || DATA.minDate; render(); });
 $("to").addEventListener("change", (e) => { state.to = e.target.value || DATA.maxDate; render(); });
 
-const panel = $("panel");
-$("pick").addEventListener("click", () => {
-  const open = panel.hidden;
-  panel.hidden = !open;
-  $("pick").setAttribute("aria-expanded", String(open));
-  if (open) { renderOpts(); $("search").focus(); }
-});
-$("search").addEventListener("input", () => renderOpts());
-$("selall").addEventListener("click", () => { state.picked = new Set(Object.keys(DATA.customers)); render(); });
-$("selnone").addEventListener("click", () => { state.picked.clear(); render(); });
+/* Both dropdowns close on the button, on a click outside, and on Escape. One registry
+   rather than two copies of the logic, so opening one closes the other and a click
+   inside either is never mistaken for a click outside the one that is open. */
+const PANELS = [
+  { btn: "pick",  panel: "panel",   onOpen: () => { renderOpts(); $("search").focus(); } },
+  { btn: "spick", panel: "sppanel", onOpen: () => renderSpOpts() },
+  { btn: "gpick", panel: "gppanel", onOpen: () => renderGpOpts() },
+  // Every trend tab's dropdowns, so all of them close the same way.
+  ...Object.values(TRENDS).flatMap((t) => t.panels),
+];
+const closePanel = (p) => {
+  if ($(p.panel).hidden) return;
+  $(p.panel).hidden = true;
+  $(p.btn).setAttribute("aria-expanded", "false");
+};
+
+for (const p of PANELS) {
+  $(p.btn).addEventListener("click", () => {
+    const open = $(p.panel).hidden;
+    for (const q of PANELS) if (q !== p) closePanel(q);
+    $(p.panel).hidden = !open;
+    $(p.btn).setAttribute("aria-expanded", String(open));
+    if (open) p.onOpen();
+  });
+}
 document.addEventListener("click", (e) => {
-  if (!panel.hidden && !panel.contains(e.target) && e.target !== $("pick") && !$("pick").contains(e.target)) {
-    panel.hidden = true;
-    $("pick").setAttribute("aria-expanded", "false");
+  for (const p of PANELS) {
+    const el = $(p.panel), btn = $(p.btn);
+    if (!el.hidden && !el.contains(e.target) && e.target !== btn && !btn.contains(e.target)) closePanel(p);
   }
 });
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && !panel.hidden) { panel.hidden = true; $("pick").setAttribute("aria-expanded", "false"); $("pick").focus(); }
+  if (e.key !== "Escape") return;
+  for (const p of PANELS) {
+    if ($(p.panel).hidden) continue;
+    closePanel(p);
+    $(p.btn).focus();
+  }
 });
+
+$("search").addEventListener("input", () => renderOpts());
+/* Mutate the selection rather than replacing it: fillOpts binds its listeners to the
+   set object it was handed, so a reassignment here would orphan every checkbox. */
+$("selall").addEventListener("click", () => {
+  for (const no of Object.keys(DATA.customers)) state.picked.add(no);
+  render();
+});
+$("selnone").addEventListener("click", () => { state.picked.clear(); render(); });
+$("spall").addEventListener("click", () => { for (const c of SP_CODES) state.sp.add(c); render(); });
+$("spnone").addEventListener("click", () => { state.sp.clear(); render(); });
+$("gpall").addEventListener("click", () => { for (const g of DATA.groups) state.grp.add(g); render(); });
+$("gpnone").addEventListener("click", () => { state.grp.clear(); render(); });
+
+/* A filter that cannot narrow anything is worse than no filter: it invites a click and
+   does nothing. Hide the salesperson picker unless there is a choice to make. */
+if (SP_CODES.length < 2) $("spick").closest(".field").hidden = true;
+if (DATA.groups.length < 2) $("gpick").closest(".field").hidden = true;
+
 $("reset").addEventListener("click", () => {
-  state.from = DATA.minDate; state.to = DATA.maxDate; state.picked.clear();
+  state.from = DATA.minDate; state.to = DATA.maxDate;
+  state.picked.clear(); state.sp.clear(); state.grp.clear();
   state.sort = "total:rev"; state.dir = -1;
   $("search").value = "";
   render();
 });
 
 buildPresets();
+for (const t of Object.values(TRENDS)) { t.build(); t.sync(); }
+TRENDS.mt.render();
+TRENDS.rev.render();
 render();
 </script>
