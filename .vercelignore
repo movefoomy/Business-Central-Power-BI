@@ -1,0 +1,12 @@
+# Credentials and refresh artefacts must never reach a public host.
+config.json
+data.json
+refresh.log
+refresh.py
+run_refresh.ps1
+dashboard.template.html
+CLAUDE.md
+CHANGELOG.md
+README.md
+.claude/
+.mcp.json
