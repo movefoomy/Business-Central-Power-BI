@@ -21,8 +21,22 @@ CHECK_TOTALS=0 python refresh.py   # skip the sanity and drift checks
 
 A Windows scheduled task, **BC Sales Margin Refresh**, runs `run_refresh.ps1` hourly (interactive logon,
 no stored password) and appends to `refresh.log`. Inspect with `Get-ScheduledTaskInfo -TaskName
-'BC Sales Margin Refresh'` — `LastTaskResult` 0 is success. The hourly job refreshes the **local file
-only**; the published artifact embeds its data at build time and must be republished by Claude.
+'BC Sales Margin Refresh'` — `LastTaskResult` 0 is success.
+
+**The task also publishes.** On a clean run it commits `dashboard.html` and pushes to
+`dashboard/main` (`github.com/movefoomy/Business-Central-Power-BI`, private), and Vercel rebuilds
+<https://business-central-power-bi.vercel.app/> from that push. This is the only shape that works:
+Business Central is on-prem behind a self-signed cert, so no cloud cron can reach it — this machine
+fetches, and pushing is how the result leaves it. It pushes **only when `refresh.py` exits 0**, so a
+build the sanity gate rejected never reaches the site, and a push failure is logged without failing
+the task — the commit stays local and the next hour retries. `GIT_TERMINAL_PROMPT=0` and
+`GCM_INTERACTIVE=never` are set so an expired credential fails fast instead of hanging the task
+forever on an invisible prompt. It pushes every hour even when the figures have not moved, because
+the page's own refresh stamp goes amber past 90 minutes: skipping unchanged data would make a healthy
+site look stalled.
+
+The **claude.ai artifact is a separate publication** and does not follow: it embeds its data at build
+time and must still be republished by Claude.
 
 Nothing to install, nothing to lint. To republish, call the Artifact tool on `dashboard.html` —
 republishing the **same file path** keeps the URL; from another conversation pass that URL as `url`, or
