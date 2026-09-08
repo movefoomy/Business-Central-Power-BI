@@ -17,7 +17,16 @@ other -- CIM sells to customer C0002 (which is CIL) and CIL sells to CI07 (which
 about S$19M between them -- so Group revenue counts that trade twice. That is intended
 and is stated in the dashboard footer. Do not quietly net it off.
 
-Usage:  python refresh.py
+Usage:  python refresh.py                 # every company in config.json
+        python refresh.py --company CIM   # just this one, merged into the last payload
+
+A partial refresh MERGES. CIL is 855,000 value entries and takes twenty-odd minutes;
+CIM is 37,000 and takes about one. Refreshing only the company being looked at is the
+difference between a coffee and a wait -- but the page still has to hold every company,
+because the selector switches between them without going back to BC. So a partial run
+keeps the other companies' rows and lookups from the previous data.json and replaces only
+its own, and every company carries its own refreshedAt so the page can say which figures
+are actually fresh rather than implying all of them are.
 """
 
 import base64
@@ -251,11 +260,96 @@ def fetch_company(cfg, header, ctx, name):
     return entries, customer_rows, item_rows, sp_rows
 
 
-def build():
+def load_previous(path):
+    """The last payload, or None. A partial refresh merges into it."""
+    try:
+        with open(path, encoding="utf-8") as fh:
+            prev = json.load(fh)
+    except (OSError, ValueError):
+        return None
+    return prev if isinstance(prev, dict) and prev.get("rows") else None
+
+
+def merge_notes(prev, refreshed, mt_notes):
+    """Carry across the conversion notes belonging to companies this run did not fetch."""
+    old = prev.get("mtNotes") or {}
+    for key in ("derived", "weightless"):
+        carried = [e for e in (old.get(key) or [])
+                   if e.get("company") and e["company"] not in refreshed]
+        mt_notes[key] = carried + mt_notes[key]
+    return mt_notes
+
+
+def merge_previous(prev, refreshed, rows, names, sp_names, item_desc,
+                   per_company, companies, stamp):
+    """Fold a partial rebuild into the previous payload.
+
+    `refreshed` is the set of company codes this run actually fetched. Everything about
+    the others is carried across untouched: their rows, their share of the lookup maps,
+    their conversion notes, their date span and their refreshedAt. Nothing is recomputed
+    from stale rows -- the maps are unions keyed by code, which is safe here for exactly
+    the reason the two-company build was safe in the first place.
+    """
+    kept = [r for r in prev["rows"] if r[-4] not in refreshed]
+    rows = sorted(kept + rows)
+
+    # Previous maps first, this run's on top: a name the refreshed company has just
+    # restated should win, and a code only the other company uses must survive.
+    merged_names = dict(prev.get("customers") or {})
+    merged_names.update(names)
+    merged_sp = dict(prev.get("salespeople") or {})
+    merged_sp.update(sp_names)
+    merged_items = dict(prev.get("items") or {})
+    merged_items.update(item_desc)
+
+    # Per-company spans and stamps: this run's for what it fetched, the previous run's
+    # for what it did not.
+    old_co = {c.get("code"): c for c in (prev.get("companies") or [])}
+    for code, bc_name in companies:
+        if code in refreshed:
+            per_company[code]["refreshedAt"] = stamp
+            continue
+        was = old_co.get(code) or {}
+        co_rows = [r for r in kept if r[-4] == code]
+        dates = [r[2] for r in co_rows if r[2]]
+        per_company[code] = {
+            "label": was.get("label") or code,
+            "bcName": bc_name,
+            "minDate": min(dates) if dates else was.get("minDate", ""),
+            "maxDate": max(dates) if dates else was.get("maxDate", ""),
+            "refreshedAt": was.get("refreshedAt") or prev.get("generatedISO") or "",
+            # Recomputed from the rows being carried, so the sanity gate still covers them.
+            "mt": sum(r[-3] for r in co_rows) / 1000.0,
+            "revenue": sum(r[-2] for r in co_rows),
+            "cogs": sum(r[-1] for r in co_rows),
+        }
+    return rows, merged_names, merged_sp, merged_items
+
+
+def build(only=None):
     cfg = load_config()
     header, ctx = make_opener(cfg)
     companies = company_list(cfg)
     labels = cfg.get("company_labels") or {}
+
+    known = [c for c, _ in companies]
+    refreshed = set(known) if not only else {c for c in only if c in known}
+    unknown = sorted(set(only or []) - set(known))
+    if unknown:
+        sys.exit("unknown company code(s): {0}. Known: {1}".format(
+            ", ".join(unknown), ", ".join(known)))
+    if not refreshed:
+        sys.exit("no company selected to refresh")
+
+    data_path = os.path.join(HERE, "data.json")
+    previous = load_previous(data_path) if refreshed != set(known) else None
+    if only and previous is None and refreshed != set(known):
+        sys.exit("cannot refresh {0} alone: there is no previous data.json to merge into."
+                 " Run a full refresh first.".format(", ".join(sorted(refreshed))))
+    if refreshed != set(known):
+        print("Partial refresh: {0} (keeping {1} from the last run)".format(
+            ", ".join(sorted(refreshed)),
+            ", ".join(c for c in known if c not in refreshed)))
 
     derive = cfg.get("derive_missing_conversion", True)
     note = lambda: {"units": 0.0, "kg": 0.0, "custs": set(), "docs": set(),
@@ -268,6 +362,8 @@ def build():
     per_company = collections.OrderedDict()
 
     for code, bc_name in companies:
+        if code not in refreshed:
+            continue
         print("Fetching {0} ({1})...".format(code, bc_name))
         entries, customer_rows, item_rows, sp_rows = fetch_company(cfg, header, ctx, bc_name)
 
@@ -378,6 +474,14 @@ def build():
          round(-kg, 2), round(rev, 2), round(-cost, 2)]
         for (no, group, date, sp, sector, item, co), (kg, rev, cost) in sorted(agg.items())
     ]
+    stamp_iso = datetime.datetime.now().astimezone().isoformat(timespec="seconds")
+    for code in refreshed:
+        per_company[code]["refreshedAt"] = stamp_iso
+    if previous is not None:
+        rows, names, sp_names, item_desc = merge_previous(
+            previous, refreshed, rows, names, sp_names, item_desc,
+            per_company, companies, stamp_iso)
+
     print("")
     print("  {0} aggregate rows across {1} companies".format(len(rows), len(companies)))
 
@@ -403,6 +507,8 @@ def build():
         return out
 
     mt_notes = {"derived": summarise(derived), "weightless": summarise(weightless)}
+    if previous is not None:
+        merge_notes(previous, refreshed, mt_notes)
     if mt_notes["derived"]:
         print("")
         print("  Conversion to kg was not set in BC; taken from the base unit of measure:")
@@ -439,11 +545,15 @@ def build():
     data = {
         "generated": datetime.datetime.now().strftime("%d %b %Y, %H:%M"),
         # Offset-aware, so the page can age it correctly from any timezone.
-        "generatedISO": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
+        "generatedISO": stamp_iso,
+        # refreshedAt is per company because a partial run leaves the others as they
+        # were; the page reads it so the stamp cannot claim figures are fresher than they
+        # are. generatedISO stays the age of the payload as a whole.
         "companies": [
             {"code": code, "label": per_company[code]["label"],
              "minDate": per_company[code]["minDate"],
-             "maxDate": per_company[code]["maxDate"]}
+             "maxDate": per_company[code]["maxDate"],
+             "refreshedAt": per_company[code].get("refreshedAt", "")}
             for code, _ in companies
         ],
         "defaultCompany": cfg.get("default_company") or companies[0][0],
@@ -478,7 +588,6 @@ def build():
         total_rev - total_cogs,
         (total_rev - total_cogs) / total_rev * 100 if total_rev else 0))
 
-    data_path = os.path.join(HERE, "data.json")
     totals = {"mt": total_mt, "revenue": total_rev, "cogs": total_cogs}
     rev_per_mt = total_rev / total_mt if total_mt else 0.0
 
@@ -541,5 +650,25 @@ def build():
     print("Wrote dashboard.html ({0:.1f} KB embedded data)".format(len(blob) / 1024))
 
 
+def parse_args(argv):
+    """--company CODE, repeatable. No flag means every company in config.json."""
+    only, i = [], 0
+    while i < len(argv):
+        a = argv[i]
+        if a in ("--company", "-c"):
+            i += 1
+            if i >= len(argv):
+                sys.exit("--company needs a code")
+            only.extend(p.strip() for p in argv[i].split(",") if p.strip())
+        elif a.startswith("--company="):
+            only.extend(p.strip() for p in a.split("=", 1)[1].split(",") if p.strip())
+        elif a in ("-h", "--help"):
+            sys.exit(__doc__)
+        else:
+            sys.exit("unrecognised argument: {0}".format(a))
+        i += 1
+    return only or None
+
+
 if __name__ == "__main__":
-    build()
+    build(parse_args(sys.argv[1:]))

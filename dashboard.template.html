@@ -3305,6 +3305,7 @@ function syncCompanyChrome() {
     sel.classList.toggle("group", coCode === CO_GROUP);
     applyCompanyScope();
     syncCompanyChrome();
+    renderStamp();          // freshness is per company, so it changes with the selection
     // Same per-company reasoning as the trend tabs: selections are cleared, dates kept.
     state.picked.clear();
     state.sp.clear();
@@ -3316,6 +3317,7 @@ function syncCompanyChrome() {
     syncFilterVisibility();
     renderMtNotes();
     for (const t of Object.values(TRENDS)) t.recompany();
+    document.dispatchEvent(new CustomEvent("company-changed"));
     render();
   });
 })();
@@ -3329,10 +3331,26 @@ syncCompanyChrome();
    a day is the point at which figures are old enough to mislead someone who has left the
    tab open since yesterday. */
 const STALE_AFTER_MIN = 720;
+/* When the selection is one company that is its own refreshedAt; under Group it is the
+   OLDER of the two, because Group is only as fresh as its stalest half. Falls back to the
+   payload stamp for a data.json written before per-company stamps existed. */
+function scopeRefreshedISO() {
+  const list = (DATA.companies || []).filter(
+    (c) => coCode === CO_GROUP || c.code === coCode);
+  const stamps = list.map((c) => c.refreshedAt).filter(Boolean);
+  if (!stamps.length) return DATA.generatedISO || "";
+  return stamps.sort()[0];
+}
+
 function renderStamp() {
-  $("gen").textContent = DATA.generated || "—";
+  const iso = scopeRefreshedISO();
   const el = $("ago"), stamp = $("stamp");
-  const t = DATA.generatedISO ? Date.parse(DATA.generatedISO) : NaN;
+  const t = iso ? Date.parse(iso) : NaN;
+  $("gen").textContent = Number.isFinite(t)
+    ? new Date(t).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric",
+                                            hour: "2-digit", minute: "2-digit" })
+        .replace(",", "")
+    : (DATA.generated || "—");
   if (!Number.isFinite(t)) { el.textContent = ""; return; }
   const mins = Math.max(0, Math.round((Date.now() - t) / 60000));
   const ago = mins < 1 ? "just now"
@@ -3342,9 +3360,10 @@ function renderStamp() {
   el.textContent = " · " + ago;
   const stale = mins > STALE_AFTER_MIN;
   stamp.classList.toggle("stale", stale);
-  stamp.title = stale
-    ? "This data is " + ago + ". Use Refresh data to rebuild it from Business Central."
-    : "Refreshed from Business Central on demand.";
+  const who = coCode === CO_GROUP ? "Both companies" : (CO_LABEL[coCode] || coCode);
+  stamp.title = who + ": " + (stale
+    ? "this data is " + ago + ". Use Refresh data to rebuild it from Business Central."
+    : "refreshed from Business Central on demand.");
 }
 renderStamp();
 setInterval(renderStamp, 30000);
@@ -3392,10 +3411,17 @@ setInterval(renderStamp, 30000);
     c.note.classList.toggle("bad", kind === "bad");
     c.note.classList.toggle("good", kind === "good");
   });
+  // The label names what pressing it will rebuild, because that is the difference
+  // between a minute and half an hour.
+  const scopeName = () => (coCode === CO_GROUP
+    ? "both companies"
+    : (CO_LABEL[coCode] || coCode));
+  const idle = () => "Refresh " + (coCode === CO_GROUP ? "both" : (coCode || "data"));
   const busy = (on) => controls.forEach((c) => {
     c.btn.disabled = on;
     c.btn.classList.toggle("busy", on);
-    c.label.textContent = on ? "Refreshing\u2026" : "Refresh data";
+    c.label.textContent = on ? "Refreshing\u2026" : idle();
+    c.btn.title = on ? "" : "Rebuilds " + scopeName() + " from Business Central";
   });
 
   const mins = (secs) => {
@@ -3451,9 +3477,20 @@ setInterval(renderStamp, 30000);
   }
 
   function start() {
+    // Only the selected company. refresh.py merges a partial run into the previous
+    // payload, so the other company's rows and lookups survive untouched -- the selector
+    // still switches to it without going back to BC.
+    const wanted = coCode === CO_GROUP
+      ? (DATA.companies || []).map((c) => c.code)
+      : [coCode];
     busy(true);
-    say("Starting\u2026");
-    fetch("/api/refresh", { method: "POST", cache: "no-store" })
+    say("Rebuilding " + scopeName() + "\u2026");
+    fetch("/api/refresh", {
+      method: "POST",
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ companies: wanted }),
+    })
       // 409 means one is already running, which is a state to join, not an error.
       .then((r) => { if (!r.ok && r.status !== 409) throw new Error("HTTP " + r.status); })
       .then(watch)
@@ -3461,12 +3498,16 @@ setInterval(renderStamp, 30000);
   }
   controls.forEach((c) => c.btn.addEventListener("click", start));
 
+  // The button names the current company, so it is relabelled when that changes.
+  document.addEventListener("company-changed", () => { if (!polling) busy(false); });
+
   // Probe once. Only a server that answers this turns the controls on -- and if a refresh
   // is already in flight (someone reloaded mid-run), join it rather than start another.
   fetch("/api/status", { cache: "no-store" })
     .then((r) => (r.ok ? r.json() : Promise.reject()))
     .then((st) => {
       show();
+      busy(false);
       if (st.running) { busy(true); watch(); }
     })
     .catch(() => { /* no server behind this page: leave the controls hidden */ });

@@ -53,6 +53,24 @@ figures the only way it can, from the push a clean run makes. A refresh is minut
 controller polls `/api/status`, shows elapsed time and the last meaningful log line, and reloads only on
 exit 0. Reloading mid-run reattaches to the running job instead of starting a second one.
 
+**A refresh rebuilds only the selected company, and a partial run MERGES.** CIL is 855,000 value entries
+and about twenty-five minutes; CIM is 37,000 and about one, so refreshing the company you are looking at is
+the difference between a coffee and a wait. But the page must still hold every company, because the selector
+switches between them without going back to BC — so `refresh.py --company CIM` keeps CIL's rows, lookups and
+conversion notes from the previous `data.json` and replaces only its own. `merge_previous()` and
+`merge_notes()` own that, and they run at different points for a reason: rows and maps merge straight after
+aggregation, because the customer list, the item list and the date span are all derived from `rows` below;
+the notes merge only once `summarise()` has built them. **Getting that order wrong is not caught by anything
+but a real partial run.**
+
+**Every company carries its own `refreshedAt`**, and the page reads it rather than the payload-wide
+`generatedISO`. A CIM-only refresh leaves CIL exactly as it was, and a single stamp would claim otherwise.
+Under Group the stamp shows the **older** of the two, because Group is only as fresh as its stalest half.
+
+**The selection reaches a subprocess argument, so it is checked against `config.json` rather than trusted.**
+`serve.py` refuses any code not declared there with a 400; `run_refresh.ps1` takes `-Company` and forwards it
+as `--company`. A full refresh is still what happens when nothing is named.
+
 **Publishing still happens on a clean run**, because `run_refresh.ps1` is unchanged: it commits
 `dashboard.html` and pushes to `dashboard/main`, and Vercel rebuilds
 <https://business-central-power-bi.vercel.app/> from that push. It pushes **only when `refresh.py` exits

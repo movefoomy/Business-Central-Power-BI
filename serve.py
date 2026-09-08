@@ -62,6 +62,7 @@ class Job(object):
         self.finished = None
         self.code = None
         self.lines = []
+        self.companies = []
 
     def snapshot(self):
         with self.lock:
@@ -71,10 +72,11 @@ class Job(object):
                 "finishedAt": self.finished,
                 "elapsed": round(time.time() - self.started, 1) if self.started and self.running else None,
                 "exitCode": self.code,
+                "companies": list(self.companies),
                 "tail": list(self.lines[-TAIL_LINES:]),
             }
 
-    def start(self):
+    def start(self, companies=None):
         """True if this call started a run; False if one was already going."""
         with self.lock:
             if self.running:
@@ -84,14 +86,20 @@ class Job(object):
             self.finished = None
             self.code = None
             self.lines = []
+            self.companies = list(companies or [])
         threading.Thread(target=self._run, daemon=True).start()
         return True
 
     def _run(self):
+        cmd = ["powershell", "-NoProfile", "-NonInteractive",
+               "-ExecutionPolicy", "Bypass", "-File", WRAPPER]
+        # Only what the page asked for. refresh.py merges a partial run into the previous
+        # payload, so the other companies survive untouched.
+        if self.companies:
+            cmd += ["-Company", ",".join(self.companies)]
         try:
             proc = subprocess.Popen(
-                ["powershell", "-NoProfile", "-NonInteractive",
-                 "-ExecutionPolicy", "Bypass", "-File", WRAPPER],
+                cmd,
                 cwd=HERE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                 text=True, encoding="utf-8", errors="replace", bufsize=1,
             )
@@ -164,6 +172,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _known_companies(self):
+        """Company codes config.json declares, so a request can be checked against them."""
+        try:
+            with open(os.path.join(HERE, "config.json"), encoding="utf-8") as fh:
+                cfg = json.load(fh)
+        except (OSError, ValueError):
+            return []
+        return [str(k) for k in (cfg.get("companies") or {})]
+
     def do_POST(self):
         if self.path.split("?", 1)[0] != "/api/refresh":
             return self._json(404, {"error": "not found"})
@@ -171,7 +188,25 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return
         if not os.path.exists(WRAPPER):
             return self._json(500, {"error": "run_refresh.ps1 is missing"})
-        if JOB.start():
+
+        # The body names which companies to rebuild. It is checked against config.json
+        # rather than passed along: this value becomes a subprocess argument, and an
+        # allow-list is the only sound way to hand user input to one.
+        wanted = []
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+            if length > 0:
+                body = json.loads(self.rfile.read(min(length, 4096)).decode("utf-8"))
+                asked = body.get("companies") or ([body["company"]] if body.get("company") else [])
+                known = self._known_companies()
+                unknown = [c for c in asked if c not in known]
+                if unknown:
+                    return self._json(400, {"error": "unknown company: " + ", ".join(map(str, unknown))})
+                wanted = list(asked)
+        except (ValueError, KeyError, UnicodeDecodeError):
+            return self._json(400, {"error": "could not read the request body"})
+
+        if JOB.start(wanted):
             return self._json(202, JOB.snapshot())
         return self._json(409, JOB.snapshot())   # already running; the page just polls on
 

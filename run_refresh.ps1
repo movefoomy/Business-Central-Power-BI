@@ -15,6 +15,14 @@
   A push failure is logged but never fails the task: the local dashboard is still good.
 #>
 
+<#
+  .PARAMETER Company
+    One or more company codes to refresh, e.g. -Company CIM. Omitted means all of them.
+    A partial refresh merges into the previous data.json rather than replacing it, so the
+    page still holds every company; refresh.py owns that merge.
+#>
+param([string[]] $Company)
+
 $ErrorActionPreference = 'Continue'
 Set-Location -LiteralPath $PSScriptRoot
 
@@ -39,11 +47,15 @@ if (-not (Test-Path -LiteralPath $py)) {
     }
 }
 
-$output = & $py 'refresh.py' 2>&1
+$pyArgs = @('refresh.py')
+if ($Company -and $Company.Count -gt 0) { $pyArgs += @('--company', ($Company -join ',')) }
+
+$output = & $py $pyArgs 2>&1
 $code   = $LASTEXITCODE
 $status = if ($code -eq 0) { 'OK' } else { "FAILED (exit $code)" }
 
-$entry = @("===== $stamp  $status =====")
+$scope = if ($Company -and $Company.Count -gt 0) { " [" + ($Company -join ',') + "]" } else { "" }
+$entry = @("===== $stamp$scope  $status =====")
 foreach ($line in $output) { $entry += '  ' + ($line -replace '\s+$', '') }
 
 # Publish. Only on a clean refresh -- never push a build the sanity gate rejected.
