@@ -210,11 +210,9 @@ product; do not "tidy" them into the side panel.
   `flex: 1 1 auto` on its `.tabs`). Sized to its contents it was a short card floating above dead space. The
   growth goes to the nav rather than to a spacer so the four views sit in the middle of the column, in easy
   reach, with the stamp pinned to the foot by its `margin-top: auto`.
-- **Every tab names itself the same way.** The trend tabs do it in a `card-head` at the top of their tile, and
-  the margin tab uses the **same card and the same card-head** (`.page-card`) rather than a bare block, so the
-  four read as one kind of thing. It cannot share a card with the filter band below it: sticky is bounded by
-  its containing block, and a band inside that short card would unstick almost immediately. The head is the
-  card's only child, so its divider is turned off — otherwise it is a rule with nothing under it.
+- **Every tab names itself.** The trend tabs do it in their first `card-head`; the margin tab opens with a
+  filter band rather than a card, so it has a `.page-head` of its own. Before the `h1` moved into the side
+  panel it was doing that job — a tab that opens with controls and no heading does not say what it is.
 
 **The `hidden` attribute needs its own `!important` rule.** The browser's default
 `[hidden] { display: none }` comes from the UA stylesheet, so *any* author `display` outranks it.
@@ -264,29 +262,23 @@ and a click inside any of them is never mistaken for a click outside. Add a four
 `PANELS` and a `render*Opts`, not by copying the wiring. Customer and salesperson also share `fillOpts`;
 **the product picker does not**, because it is a tree rather than a list — see below.
 
-**The product filter is two levels: product group, then item description, on ALL FOUR TABS.** A group is too
-coarse a question on its own — `NAOH` covers 22 item descriptions under CIM and 37 under CIL, at different
-strengths and prices, so "which spec is losing money" cannot be asked of the group. `renderProductTree()` is
-the single renderer; it owns no state, taking the two Sets to read and mutate, the totals to show, a formatter
-and an `onChange`. **A fifth product picker is another call to it, never a copy.** The trend tabs replaced
-their group chip row with it, for the same reason the customer filter was never chips: a chip cannot carry a
-second level, and 175 descriptions is far past what a chip row holds. Each trend tab shows the figure beside
-each entry in **its own measure** — tonnage on the MT tab, gross profit on the GP tab — via `productTotalsT()`,
-not revenue.
+**The product filter is two levels: product group, then item description — on the MARGIN TAB ONLY.** The trend
+tabs filter by group alone, through a chip row and their own `st.groups`. A group is too coarse a question on
+the margin tab: `NAOH` covers 22 item descriptions under CIM and 37 under CIL, at different strengths and
+prices, so "which spec is losing money" cannot be asked of the group.
 
-- **The selection is two sets, not one.** The margin tab's are `state.grp`/`state.item`; each trend tab has its
-  own `st.groups`/`st.item`, so the tabs stay independent while the meaning of a tick does not.
-  `productPasses(grpSet, itemSet, grp, item)` is the single predicate: both empty means no filter, otherwise
-  the row passes if **either** its group or its item is ticked. That OR is what makes a parent tick mean "all
-  of these" and a child tick mean "just this one". Every filtering loop goes through it — never test a group
-  Set directly again.
-- **Both empty means everything, and so does every group ticked whole.** `productIsAll()` treats the two
-  alike, so Select all does not light a pill that narrows nothing. The trend tabs' `st.groups` starts empty
-  rather than as every group, which is what lets them share the predicate: the old shape could not express
-  "all of NAOH plus one spec of HCL".
-- **`selectedGroups()` decides which lines a trend tab draws**, in fixed palette order: a group is on screen
-  if it is ticked whole or any of its items is. Colour still follows the group, so narrowing to one spec never
-  repaints its neighbours — asserted.
+Extending the tree to the three trend tabs was built and then **rolled back by request** (8 Sep 2026), along
+with the shared `renderProductTree()` it was refactored into. If it is revisited, the things that made it work
+were: one renderer taking the two Sets, the totals, a formatter and an `onChange`, so no tab owns a copy; each
+trend tab's `st.groups` starting **empty** (meaning everything) rather than as every group, since the old shape
+cannot express "all of NAOH plus one spec of HCL"; each tab showing the figure beside an entry in **its own
+measure**, not revenue; and a `selectedGroups()` helper deciding which lines exist, in fixed palette order.
+
+- **The selection is two sets, not one.** `state.grp` holds groups ticked WHOLE; `state.item` holds individual
+  item codes ticked inside a group that is not. `inProduct(grp, item)` is the single predicate: both empty
+  means no filter, otherwise the row passes if **either** its group or its item is ticked. That OR is what
+  makes a parent tick mean "all of these" and a child tick mean "just this one". `compute()` and
+  `optionTotals` both go through it — never test `state.grp` directly again.
 - **Ticking a parent clears any part-selection under it**, and unticking one child of a whole group rewrites
   the selection as "every item except this one" (drop the group, add the siblings). Those two rules are what
   keep the parent checkbox honest: checked when the group is whole, **indeterminate** when only some items are,
