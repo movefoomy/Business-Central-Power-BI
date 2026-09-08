@@ -206,6 +206,13 @@ product; do not "tidy" them into the side panel.
   it folds — binding only one axis breaks whichever layout is not being looked at.
 - **`#notes-footer` lives inside `.content`**, not below the shell: it is a caveat about the figures, so it
   has to line up with them rather than start under the side panel.
+- **The panel is full-height, and the tab strip takes the slack** (`height: calc(100vh - 32px)` on `.sidebar`,
+  `flex: 1 1 auto` on its `.tabs`). Sized to its contents it was a short card floating above dead space. The
+  growth goes to the nav rather than to a spacer so the four views sit in the middle of the column, in easy
+  reach, with the stamp pinned to the foot by its `margin-top: auto`.
+- **Every tab names itself.** The trend tabs do it in their first `card-head`; the margin tab opens with a
+  filter band rather than a card, so it has a `.page-head` of its own. Before the `h1` moved into the side
+  panel it was doing that job — a tab that opens with controls and no heading does not say what it is.
 
 **The `hidden` attribute needs its own `!important` rule.** The browser's default
 `[hidden] { display: none }` comes from the UA stylesheet, so *any* author `display` outranks it.
@@ -338,11 +345,15 @@ and group selection in `st` — deliberately independent of the margin tab's fil
   on the same day.
 - Colour comes from the same `classOf` map as the bars. A group is one colour on both tabs, and
   deselecting one never repaints the others.
-- **Only the margin tab's filter band is sticky.** `.filters` carries `position: sticky; top: 0; z-index: 40`;
-  the trend tabs' `.slicers` deliberately does not. Making it sticky was tried and reverted by request. If it
-  is ever revisited: sticky is bounded by its containing block, so a band inside its chart tile holds only
-  while that tile is on screen, and it is broken outright by an `overflow`, `transform`, `filter` or `contain`
-  anywhere up the ancestor chain — nothing on `.wrap`, `.card` or the tab panel has one today.
+- **Both filter bands are sticky.** `.filters` on the margin tab and `.slicers` on every trend tab carry
+  `position: sticky; top: 0; z-index: 40`, so the controls stay reachable down a long page. They are bounded
+  differently, and deliberately: `.filters` is a direct child of the margin panel and holds for the whole tab,
+  while `.slicers` sits inside its chart tile, so it releases once the chart and its table twin have scrolled
+  past rather than following the reader into the footers. **Keep the band inside the card** — hoisting it out
+  to "fix" that would make it shadow the footers instead. Sticky is broken outright by an `overflow`,
+  `transform`, `filter` or `contain` anywhere up the ancestor chain; nothing on `.wrap`, `.shell`, `.content`,
+  `.card` or the tab panel has one today, so do not add one casually. Both bands opt out below 640px, where
+  they are several rows tall and would eat the viewport, and both need an opaque background.
 
 - **The slicer lives inside the tile.** The dataviz skill calls per-chart filters an anti-pattern, its
   rule being one filter row above everything it scopes. That tab holds exactly one chart plus its table
