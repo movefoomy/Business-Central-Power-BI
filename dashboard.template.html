@@ -190,13 +190,18 @@ select.co-select.group { border-color: var(--accent); color: var(--accent); }
 .stamp.stale .ago { color: var(--warn); font-weight: 600; }
 
 /* A tab that opens with a filter band and no heading does not say what it is. The trend
-   tabs name themselves in their first card-head; this is the margin tab's equivalent,
-   standing on its own because that tab opens with the band rather than with a card. */
-.page-head { padding: 2px 2px 14px; }
-.page-head h2 {
-  margin: 5px 0 0; font-size: 19px; font-weight: 600; letter-spacing: -.015em;
-}
-.page-head .hint { margin: 4px 0 0; font-size: 12.5px; color: var(--ink-2); }
+   tabs name themselves in a card-head at the top of their tile, so the margin tab uses the
+   SAME card and the same card-head rather than a bare block on the page background -- the
+   four tabs read as one kind of thing that way.
+
+   It cannot share a card with the filter band below it, tempting as that is: sticky is
+   bounded by its containing block, and a band inside this short card would unstick after
+   about eighty pixels of scroll instead of holding for the tab.
+
+   The head is the card's only child, so its divider would be a rule with nothing under
+   it. */
+.page-card { margin-bottom: 22px; }
+.page-card .card-head { border-bottom: 0; padding-bottom: 16px; }
 
 /* ---------- filter bar ---------- */
 .filters {
@@ -760,11 +765,13 @@ footer .flag[role="note"] i { color: var(--ink); font-style: normal; font-weight
 
   <div id="panel-margin" role="tabpanel" aria-labelledby="tab-margin">
 
-  <header class="page-head">
-    <p class="eyebrow">Margin</p>
-    <h2>Sales margin</h2>
-    <p class="hint">Volume, revenue, cost of sales and gross profit by customer, month by month.</p>
-  </header>
+  <section class="card page-card">
+    <div class="card-head">
+      <p class="eyebrow">Margin</p>
+      <h2>Sales margin</h2>
+      <p class="hint">Volume, revenue, cost of sales and gross profit by customer, month by month.</p>
+    </div>
+  </section>
 
   <section class="filters" aria-label="Filters">
     <div class="field">

@@ -210,9 +210,13 @@ product; do not "tidy" them into the side panel.
   `flex: 1 1 auto` on its `.tabs`). Sized to its contents it was a short card floating above dead space. The
   growth goes to the nav rather than to a spacer so the four views sit in the middle of the column, in easy
   reach, with the stamp pinned to the foot by its `margin-top: auto`.
-- **Every tab names itself.** The trend tabs do it in their first `card-head`; the margin tab opens with a
-  filter band rather than a card, so it has a `.page-head` of its own. Before the `h1` moved into the side
-  panel it was doing that job — a tab that opens with controls and no heading does not say what it is.
+- **Every tab names itself the same way.** The trend tabs do it in a `card-head` at the top of their tile, and
+  the margin tab uses the **same card and the same card-head** (`.page-card`) rather than a bare block, so the
+  four read as one kind of thing. It cannot share a card with the filter band below it, tempting as that is:
+  sticky is bounded by its containing block, and a band inside that short card would unstick after about
+  eighty pixels of scroll instead of holding for the tab. The head is the card's only child, so its divider is
+  turned off — otherwise it is a rule with nothing under it. Before the `h1` moved into the side panel it was
+  doing this job; a tab that opens with controls and no heading does not say what it is.
 
 **The `hidden` attribute needs its own `!important` rule.** The browser's default
 `[hidden] { display: none }` comes from the UA stylesheet, so *any* author `display` outranks it.
