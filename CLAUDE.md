@@ -183,6 +183,30 @@ merge every matching rule.
 
 ## Dashboard conventions
 
+**The page is two columns: a left panel of identity, a right column of data.** `.shell` is the grid;
+`.sidebar` holds the title, the company selector, the four view tabs and the refresh stamp, and `.content`
+holds everything else. The split is by kind, not by position: the left column says what the page *is* —
+which product, which company, which view, how fresh — and the right says what it *shows*. **The filter bands
+stay on the right**, beside the figures they narrow, because a filter belongs to a view rather than to the
+product; do not "tidy" them into the side panel.
+
+- **The content column needs `min-width: 0`.** A grid column is min-content wide by default, and the monthly
+  grid is far wider than any viewport. Without it the table pushes the column open and the whole page scrolls
+  sideways instead of the table scrolling inside its own viewport — which silently undoes the point of
+  `.table-scroll`.
+- **The side panel is sticky and scrolls itself** (`top: 16px`, `max-height: calc(100vh - 32px)`,
+  `overflow-y: auto`), so it survives a short window without clipping. Its sticky is independent of the
+  margin band's, since they are siblings in different columns.
+- **The tab strip is vertical here**, so the selected marker is a left border rather than an underline — it
+  has to run along the edge the column is read from. Below 1080px the panel folds back into a header: the
+  strip returns to a row and the marker to an underline, which is why both border sides are set explicitly
+  in each state rather than only the one in use.
+- **The tablist is `aria-orientation="vertical"`**, and the keyboard handler moves on Up/Down *and*
+  Left/Right, plus Home/End. Both axes, because the same strip is vertical in the panel and horizontal once
+  it folds — binding only one axis breaks whichever layout is not being looked at.
+- **`#notes-footer` lives inside `.content`**, not below the shell: it is a caveat about the figures, so it
+  has to line up with them rather than start under the side panel.
+
 **The `hidden` attribute needs its own `!important` rule.** The browser's default
 `[hidden] { display: none }` comes from the UA stylesheet, so *any* author `display` outranks it.
 `.panel` sets `display: flex`, which made `panel.hidden = true` a no-op: the customer picker set the
