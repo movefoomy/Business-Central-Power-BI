@@ -1,9 +1,21 @@
 """Refresh the BC Sales Margin dashboard from Business Central OData.
 
-Fetches PBI_ValueEntries_New + PBI_Customer + PBI_SalesPersonCode, applies the sales
-filters, aggregates to (customer, product group, posting date, salesperson, sector) grain and
-injects the payload into
+Fetches PBI_ValueEntries_New + PBI_Customer + PBI_SalesPersonCode for EVERY company in
+config.json, applies the sales filters, aggregates to (customer, product group, posting
+date, salesperson, sector, item, company) grain and injects the payload into
 dashboard.template.html to produce dashboard.html.
+
+The companies share one BC instance and one coding scheme: a customer no, item no,
+salesperson code or product posting group means the same thing in both, verified across
+the full extract (93 shared customer codes and 70 shared item codes, zero conflicts). So
+the lookup maps are a plain union keyed by code -- no per-company namespacing, no mapping
+table. The one cosmetic disagreement is salesperson S06, named "How Huan Soon" in CIM and
+"Huan Soon" in CIL; first company wins, which is why COMPANIES is ordered.
+
+The Group view is a PLAIN SUM of the companies, by decision. The two trade with each
+other -- CIM sells to customer C0002 (which is CIL) and CIL sells to CI07 (which is CIM),
+about S$19M between them -- so Group revenue counts that trade twice. That is intended
+and is stated in the dashboard footer. Do not quietly net it off.
 
 Usage:  python refresh.py
 """
@@ -85,6 +97,12 @@ UNASSIGNED_SECTOR = ""
 NON_WEIGHT_UOM = {"PCS", "EACH", "EA", "UNIT", "JOB", "HOUR", "DAY"}
 FIXED_UOM_KG = {"KG": 1.0, "MT": 1000.0, "DMT": 1000.0, "TON": 1000.0, "G": 0.001}
 
+# The suffix rule below only holds because the PREFIX is a real container word that names
+# something with a fill weight. CIL carries XXXX-930, which is a placeholder, and reading
+# 930 kg out of it would be inventing tonnage rather than recovering it. Such codes are
+# refused and surface in mtNotes like any other unconvertible unit -- visible, not silent.
+PLACEHOLDER_UOM_PREFIXES = {"XXXX", "XXX", "ZZZZ", "ZZZ", "TBA", "TBD", "N/A", "NA"}
+
 
 def kg_per_unit(uom):
     """Kilograms per base unit, or None when the unit carries no weight."""
@@ -94,8 +112,11 @@ def kg_per_unit(uom):
     if u in FIXED_UOM_KG:
         return FIXED_UOM_KG[u]
     if "-" in u:  # packaging codes embed the fill weight, e.g. CARB-27.5
+        head, tail = u.rsplit("-", 1)
+        if head in PLACEHOLDER_UOM_PREFIXES:
+            return None
         try:
-            n = float(u.rsplit("-", 1)[1])
+            n = float(tail)
         except ValueError:
             return None
         return n if n > 0 else None
@@ -106,6 +127,8 @@ def kg_per_unit(uom):
 # dropping the Item_Ledger_Entry_Quantity filter inflates MT about 12x, which drags
 # revenue per MT from roughly 280 down to 23. Failing these REFUSES to write, so an
 # unattended run can never overwrite a good dashboard with implausible numbers.
+# Checked per company as well as overall: one healthy company must not be able to mask
+# the other going wrong, which a single blended figure would let it do.
 MIN_REVENUE_PER_MT = 50.0
 MAX_REVENUE_PER_MT = 2000.0
 
@@ -155,10 +178,10 @@ def fetch(url, header, ctx, label):
     return rows
 
 
-def entity_url(cfg, entity, select, flt=None):
+def entity_url(cfg, company, entity, select, flt=None):
     base = "{0}/Company('{1}')/{2}".format(
         cfg["base_url"].rstrip("/"),
-        urllib.parse.quote(cfg["company"]),
+        urllib.parse.quote(company),
         entity,
     )
     parts = ["$select=" + urllib.parse.quote(select)]
@@ -194,113 +217,169 @@ def previous_totals(path):
     }
 
 
-def build():
-    cfg = load_config()
-    header, ctx = make_opener(cfg)
+def company_list(cfg):
+    """[(code, BC company name)] in config order. First company wins name collisions."""
+    cos = cfg.get("companies")
+    if cos:
+        return [(str(k), str(v)) for k, v in cos.items()]
+    # Single-company config, the shape this started as.
+    return [("CO", cfg["company"])]
 
-    print("Fetching from Business Central...")
 
+def fetch_company(cfg, header, ctx, name):
+    """Every entity this company contributes, already filtered to sales documents."""
     doc_filter = " or ".join("Document_Type eq '{0}'".format(d) for d in SALES_DOC_TYPES)
     ve_filter = "({0}) and Source_No ne '{1}' and Posting_Date ge {2}".format(
         doc_filter, EXCLUDED_SOURCE_NO, cfg["min_posting_date"]
     )
     entries = fetch(
-        entity_url(cfg, VALUE_ENTRY_ENTITY, VALUE_ENTRY_SELECT, ve_filter),
-        header, ctx, "value entries",
+        entity_url(cfg, name, VALUE_ENTRY_ENTITY, VALUE_ENTRY_SELECT, ve_filter),
+        header, ctx, "  value entries",
     )
     customer_rows = fetch(
-        entity_url(cfg, "PBI_Customer", "Customer_Name,Customer_No"),
-        header, ctx, "customers",
+        entity_url(cfg, name, "PBI_Customer", "Customer_Name,Customer_No"),
+        header, ctx, "  customers",
     )
     item_rows = fetch(
-        entity_url(cfg, "PBI_Item", "No,Description,Base_Unit_of_Measure"),
-        header, ctx, "items",
+        entity_url(cfg, name, "PBI_Item", "No,Description,Base_Unit_of_Measure"),
+        header, ctx, "  items",
     )
-    items = {i["No"]: i for i in item_rows if i.get("No")}
-
     sp_rows = fetch(
-        entity_url(cfg, SALESPERSON_ENTITY, SALESPERSON_SELECT),
-        header, ctx, "salespeople",
+        entity_url(cfg, name, SALESPERSON_ENTITY, SALESPERSON_SELECT),
+        header, ctx, "  salespeople",
     )
-    sp_names = {}
-    for row in sp_rows:
-        code = (row.get("Code") or "").strip()
-        if code and code not in sp_names:
-            sp_names[code] = (row.get("Name") or code).strip() or code
+    return entries, customer_rows, item_rows, sp_rows
 
-    # PBI_Customer returns one row per ledger entry, so collapse to a No -> Name map.
-    names = {}
-    for row in customer_rows:
-        no = row.get("Customer_No")
-        if no and no not in names:
-            names[no] = (row.get("Customer_Name") or no).strip()
 
-    fetched = len(entries)
-    entries = [
-        r for r in entries
-        if not (r.get("Item_No") or "").upper().startswith(EXCLUDED_ITEM_PREFIX)
-    ]
-    print("  {0} fetched -> {1} after excluding {2}* items".format(
-        fetched, len(entries), EXCLUDED_ITEM_PREFIX))
+def build():
+    cfg = load_config()
+    header, ctx = make_opener(cfg)
+    companies = company_list(cfg)
+    labels = cfg.get("company_labels") or {}
 
-    # Aggregate to (customer, product group, posting date).
-    #
-    # Tonnage is counted ONLY on rows carrying an item ledger quantity. BC writes
-    # several value entries per goods movement (original, cost adjustment, invoice
-    # reversal, invoice actual) and repeats the same WIN_Total_Qty_in_Kg on each; only
-    # the originating entry has Item_Ledger_Entry_Quantity <> 0. Summing every row
-    # overstates volume by roughly 12x.
-    #
-    # Revenue and cost, by contrast, must use ALL rows: the expected amounts post on
-    # the shipment and are reversed by the invoice, which carries the actual amounts,
-    # so the pair nets to the true figure only when both are summed.
     derive = cfg.get("derive_missing_conversion", True)
-    note = lambda: {"units": 0.0, "kg": 0.0, "custs": set(), "docs": set(), "uom": "", "desc": ""}
-    derived = collections.defaultdict(note)    # conversion recovered from the base UOM
+    note = lambda: {"units": 0.0, "kg": 0.0, "custs": set(), "docs": set(),
+                    "uom": "", "desc": "", "co": ""}
+    derived = collections.defaultdict(note)     # conversion recovered from the base UOM
     weightless = collections.defaultdict(note)  # genuinely not weight-bearing
 
     agg = collections.defaultdict(lambda: [0.0, 0.0, 0.0])
-    for row in entries:
-        key = (
-            row.get("Source_No") or "",
-            row.get("Gen_Prod_Posting_Group") or "(none)",
-            row.get("Posting_Date") or "",
-            (row.get("Salespers_Purch_Code") or UNASSIGNED_SALESPERSON).strip(),
-            (row.get("Shortcut_Dimension_3_Code") or UNASSIGNED_SECTOR).strip(),
-        )
-        bucket = agg[key]
-        qty = num(row, "Item_Ledger_Entry_Quantity")
-        if qty != 0:
-            kg = num(row, "WIN_Total_Qty_in_Kg")
-            if kg == 0:
-                # BC left the conversion unset on this item. Fall back to the base unit of
-                # measure, and record it either way so the gap is never silent.
-                item_no = row.get("Item_No") or ""
-                meta = items.get(item_no, {})
-                per = kg_per_unit(meta.get("Base_Unit_of_Measure")) if derive else None
-                target = derived if per else weightless
-                rec = target[item_no]
-                rec["uom"] = meta.get("Base_Unit_of_Measure") or "?"
-                rec["desc"] = meta.get("Description") or row.get("Description") or ""
-                rec["units"] += -qty
-                rec["custs"].add(row.get("Source_No") or "")
-                rec["docs"].add(row.get("Document_No") or "")
-                if per:
-                    kg = qty * per
-                    rec["kg"] += -kg
-            bucket[0] += kg
-        bucket[1] += num(row, "Sales_Amount_Actual") + num(row, "Sales_Amount_Expected")
-        bucket[2] += num(row, "Cost_Amount_Actual") + num(row, "Cost_Amount_Expected")
+    names, sp_names, item_desc, entry_desc = {}, {}, {}, {}
+    per_company = collections.OrderedDict()
+
+    for code, bc_name in companies:
+        print("Fetching {0} ({1})...".format(code, bc_name))
+        entries, customer_rows, item_rows, sp_rows = fetch_company(cfg, header, ctx, bc_name)
+
+        items = {i["No"]: i for i in item_rows if i.get("No")}
+        # Union the lookups by code. Verified safe across the full extract: a customer no,
+        # item no or salesperson code names the same party in both companies. First
+        # company wins, so the config order decides the one cosmetic disagreement (S06).
+        for row in customer_rows:
+            no = row.get("Customer_No")
+            if no and no not in names:
+                names[no] = (row.get("Customer_Name") or no).strip()
+        for row in sp_rows:
+            c = (row.get("Code") or "").strip()
+            if c and c not in sp_names:
+                sp_names[c] = (row.get("Name") or c).strip() or c
+        for no, meta in items.items():
+            d = (meta.get("Description") or "").strip()
+            if d and no not in item_desc:
+                item_desc[no] = d
+
+        fetched = len(entries)
+        entries = [
+            r for r in entries
+            if not (r.get("Item_No") or "").upper().startswith(EXCLUDED_ITEM_PREFIX)
+        ]
+        print("  {0} fetched -> {1} after excluding {2}* items".format(
+            fetched, len(entries), EXCLUDED_ITEM_PREFIX))
+
+        for row in entries:
+            item_no = (row.get("Item_No") or "").strip()
+            if item_no and item_no not in entry_desc:
+                d = (row.get("Description") or "").strip()
+                if d:
+                    entry_desc[item_no] = d
+
+        # Aggregate to (customer, product group, posting date, salesperson, sector, item,
+        # company).
+        #
+        # Tonnage is counted ONLY on rows carrying an item ledger quantity. BC writes
+        # several value entries per goods movement (original, cost adjustment, invoice
+        # reversal, invoice actual) and repeats the same WIN_Total_Qty_in_Kg on each; only
+        # the originating entry has Item_Ledger_Entry_Quantity <> 0. Summing every row
+        # overstates volume by roughly 12x.
+        #
+        # Revenue and cost, by contrast, must use ALL rows: the expected amounts post on
+        # the shipment and are reversed by the invoice, which carries the actual amounts,
+        # so the pair nets to the true figure only when both are summed.
+        c_kg = c_rev = c_cost = 0.0
+        c_dates = []
+        for row in entries:
+            key = (
+                row.get("Source_No") or "",
+                row.get("Gen_Prod_Posting_Group") or "(none)",
+                row.get("Posting_Date") or "",
+                (row.get("Salespers_Purch_Code") or UNASSIGNED_SALESPERSON).strip(),
+                (row.get("Shortcut_Dimension_3_Code") or UNASSIGNED_SECTOR).strip(),
+                (row.get("Item_No") or "").strip(),
+                code,
+            )
+            bucket = agg[key]
+            if row.get("Posting_Date"):
+                c_dates.append(row["Posting_Date"])
+            qty = num(row, "Item_Ledger_Entry_Quantity")
+            if qty != 0:
+                kg = num(row, "WIN_Total_Qty_in_Kg")
+                if kg == 0:
+                    # BC left the conversion unset on this item. Fall back to the base unit
+                    # of measure, and record it either way so the gap is never silent.
+                    item_no = row.get("Item_No") or ""
+                    meta = items.get(item_no, {})
+                    per = kg_per_unit(meta.get("Base_Unit_of_Measure")) if derive else None
+                    target = derived if per else weightless
+                    rec = target[(code, item_no)]
+                    rec["co"] = code
+                    rec["uom"] = meta.get("Base_Unit_of_Measure") or "?"
+                    rec["desc"] = meta.get("Description") or row.get("Description") or ""
+                    rec["units"] += -qty
+                    rec["custs"].add(row.get("Source_No") or "")
+                    rec["docs"].add(row.get("Document_No") or "")
+                    if per:
+                        kg = qty * per
+                        rec["kg"] += -kg
+                bucket[0] += kg
+                c_kg += kg
+            r_rev = num(row, "Sales_Amount_Actual") + num(row, "Sales_Amount_Expected")
+            r_cost = num(row, "Cost_Amount_Actual") + num(row, "Cost_Amount_Expected")
+            bucket[1] += r_rev
+            bucket[2] += r_cost
+            c_rev += r_rev
+            c_cost += r_cost
+
+        per_company[code] = {
+            "label": labels.get(code, bc_name),
+            "bcName": bc_name,
+            "minDate": min(c_dates) if c_dates else "",
+            "maxDate": max(c_dates) if c_dates else "",
+            "mt": -c_kg / 1000.0,
+            "revenue": c_rev,
+            "cogs": -c_cost,
+        }
 
     # kg and cost are negative for outbound sales in BC, so negate to make them
     # display-positive. Negate rather than abs(): a return or credit memo carries the
     # opposite sign and must SUBTRACT from the bucket. Taking abs() per bucket would
     # turn those reversals into additions and overstate volume and cost.
     rows = [
-        [no, group, date, sp, sector, round(-kg, 2), round(rev, 2), round(-cost, 2)]
-        for (no, group, date, sp, sector), (kg, rev, cost) in sorted(agg.items())
+        [no, group, date, sp, sector, item, co,
+         round(-kg, 2), round(rev, 2), round(-cost, 2)]
+        for (no, group, date, sp, sector, item, co), (kg, rev, cost) in sorted(agg.items())
     ]
-    print("  {0} aggregate rows".format(len(rows)))
+    print("")
+    print("  {0} aggregate rows across {1} companies".format(len(rows), len(companies)))
 
     used = sorted({r[0] for r in rows})
     missing = [no for no in used if no not in names]
@@ -310,8 +389,9 @@ def build():
 
     def summarise(store):
         out = []
-        for item_no, rec in sorted(store.items()):
+        for (co, item_no), rec in sorted(store.items()):
             out.append({
+                "company": co,
                 "item": item_no,
                 "desc": rec["desc"],
                 "uom": rec["uom"],
@@ -327,32 +407,57 @@ def build():
         print("")
         print("  Conversion to kg was not set in BC; taken from the base unit of measure:")
         for e in mt_notes["derived"]:
-            print("    {0} ({1}) base {2}: {3:,.2f} units -> {4:,.2f} kg over {5} document(s) - {6}".format(
-                e["item"], e["desc"][:38], e["uom"], e["units"], e["kg"], e["docs"],
-                ", ".join(e["customers"])[:60]))
+            print("    [{0}] {1} ({2}) base {3}: {4:,.2f} units -> {5:,.2f} kg over {6} doc(s) - {7}".format(
+                e["company"], e["item"], e["desc"][:32], e["uom"], e["units"], e["kg"],
+                e["docs"], ", ".join(e["customers"])[:46]))
         print("    Fix at source: set the kg conversion on these items in Business Central.")
     if mt_notes["weightless"]:
         for e in mt_notes["weightless"]:
-            print("  Not weight-bearing, excluded from tonnage: {0} ({1}) base {2}, {3:,.2f} units".format(
-                e["item"], e["desc"][:38], e["uom"], e["units"]))
+            print("  Not weight-bearing, excluded from tonnage: [{0}] {1} ({2}) base {3}, {4:,.2f} units".format(
+                e["company"], e["item"], e["desc"][:32], e["uom"], e["units"]))
+
+    items_used = sorted({r[5] for r in rows})
+    item_names = {}
+    for item_no in items_used:
+        item_names[item_no] = (item_desc.get(item_no) or entry_desc.get(item_no)
+                               or item_no or "(no item)")
 
     dates = [r[2] for r in rows if r[2]]
     sp_used = sorted({r[3] for r in rows})
     sectors_used = sorted({r[4] for r in rows})
+    min_date = min(dates) if dates else ""
+    max_date = max(dates) if dates else ""
+    # The dashboard opens on the window in which every company actually trades, not on the
+    # whole extract: one company carries three years the other does not exist for, and a
+    # combined view starting there reads as a collapse rather than as an absence.
+    default_from = cfg.get("default_from") or min_date
+    if min_date and default_from < min_date:
+        default_from = min_date
+    if max_date and default_from > max_date:
+        default_from = min_date
+
     data = {
         "generated": datetime.datetime.now().strftime("%d %b %Y, %H:%M"),
         # Offset-aware, so the page can age it correctly from any timezone.
         "generatedISO": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
-        "company": cfg["company"],
-        "minDate": min(dates) if dates else "",
-        "maxDate": max(dates) if dates else "",
+        "companies": [
+            {"code": code, "label": per_company[code]["label"],
+             "minDate": per_company[code]["minDate"],
+             "maxDate": per_company[code]["maxDate"]}
+            for code, _ in companies
+        ],
+        "defaultCompany": cfg.get("default_company") or companies[0][0],
+        "defaultFrom": default_from,
+        "minDate": min_date,
+        "maxDate": max_date,
         "groups": sorted({r[1] for r in rows}),
         "mtNotes": mt_notes,
         "customers": {no: names.get(no, no) for no in used},
         "salespeople": {c: sp_names.get(c, c) for c in sp_used if c},
         # Shortcut Dimension 3, shown as "Sector". No name table for it in BC, so the code
-        # is the label; the empty code is dropped here and handled as its own option page-side.
+        # is the label; the empty code is dropped here and handled page-side.
         "sectors": [c for c in sectors_used if c],
+        "items": item_names,
         "rows": rows,
     }
 
@@ -362,10 +467,13 @@ def build():
     total_rev = sum(r[-2] for r in rows)
     total_cogs = sum(r[-1] for r in rows)
     print("")
-    print("Totals over the full range ({0} -> {1}):".format(data["minDate"], data["maxDate"]))
-    print("  Total MT       {0:>16,.2f}".format(total_mt))
-    print("  Total Revenue  {0:>16,.2f}".format(total_rev))
-    print("  Total COGS     {0:>16,.2f}".format(total_cogs))
+    print("Totals over the full range ({0} -> {1}):".format(min_date, max_date))
+    for code, _ in companies:
+        c = per_company[code]
+        print("  {0:<5} {1:>13,.2f} MT {2:>16,.2f} rev {3:>16,.2f} cogs   {4} -> {5}".format(
+            code, c["mt"], c["revenue"], c["cogs"], c["minDate"], c["maxDate"]))
+    print("  {0:<5} {1:>13,.2f} MT {2:>16,.2f} rev {3:>16,.2f} cogs".format(
+        "ALL", total_mt, total_rev, total_cogs))
     print("  Gross Profit   {0:>16,.2f}  ({1:.2f}%)".format(
         total_rev - total_cogs,
         (total_rev - total_cogs) / total_rev * 100 if total_rev else 0))
@@ -380,11 +488,23 @@ def build():
 
         problems = ["{0} is {1:,.2f}, expected above zero".format(k, v)
                     for k, v in sorted(totals.items()) if v <= 0]
-        if not problems and not MIN_REVENUE_PER_MT <= rev_per_mt <= MAX_REVENUE_PER_MT:
-            problems.append(
-                "revenue per MT is {0:,.2f}, outside the plausible {1:,.0f}-{2:,.0f} band"
-                " -- check the volume dedupe and the sign handling".format(
-                    rev_per_mt, MIN_REVENUE_PER_MT, MAX_REVENUE_PER_MT))
+        # Per company as well as overall: a blended figure lets a healthy company hide a
+        # broken one, which is exactly the failure this gate exists to catch.
+        bands = [("ALL", total_mt, total_rev)]
+        bands += [(code, per_company[code]["mt"], per_company[code]["revenue"])
+                  for code, _ in companies]
+        for label, mt, rev in bands:
+            if mt <= 0 or rev <= 0:
+                problems.append(
+                    "{0}: MT {1:,.2f} and revenue {2:,.2f} must both be above zero".format(
+                        label, mt, rev))
+                continue
+            rpm = rev / mt
+            if not MIN_REVENUE_PER_MT <= rpm <= MAX_REVENUE_PER_MT:
+                problems.append(
+                    "{0}: revenue per MT is {1:,.2f}, outside the plausible {2:,.0f}-{3:,.0f}"
+                    " band -- check the volume dedupe and the sign handling".format(
+                        label, rpm, MIN_REVENUE_PER_MT, MAX_REVENUE_PER_MT))
         if problems:
             sys.exit("REFUSING TO WRITE, existing dashboard left untouched:\n  " +
                      "\n  ".join(problems))

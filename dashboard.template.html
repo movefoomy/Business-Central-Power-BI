@@ -24,6 +24,7 @@
 
   --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
   --s5: #e87ba4; --s6: #008300; --s7: #4a3aa7;
+  --s8: #00a0b4; --s9: #a8541f;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -46,6 +47,7 @@
 
     --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
     --s5: #d55181; --s6: #008300; --s7: #9085e9;
+    --s8: #2aa7b6; --s9: #cf7038;
   }
 }
 :root[data-theme="dark"] {
@@ -68,6 +70,7 @@
 
   --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
   --s5: #d55181; --s6: #008300; --s7: #9085e9;
+  --s8: #2aa7b6; --s9: #cf7038;
 }
 
 /* ---------- base ---------- */
@@ -97,6 +100,32 @@ h1, h2, .display { font-family: Archivo, ui-sans-serif, system-ui, sans-serif; }
   font-size: 10.5px; font-weight: 700; letter-spacing: .1em;
   text-transform: uppercase; color: var(--ink-3);
 }
+
+/* ---------- company selector ---------- */
+/* It scopes every tab, so it lives in the masthead above the tab strip rather than in any
+   one tab's filter band. Styled as a control, not a heading: it is the first thing that
+   changes what every other number on the page means. */
+.cosel { display: flex; flex-direction: column; gap: 5px; margin-bottom: 9px; }
+.cosel label {
+  font-size: 10.5px; font-weight: 700; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--ink-3);
+}
+select.co-select {
+  font: inherit; font-size: 14px; font-weight: 600; color: var(--ink);
+  background: var(--surface); border: 1px solid var(--hairline);
+  border-radius: 8px; padding: 7px 34px 7px 11px; cursor: pointer;
+  min-width: 260px; appearance: none;
+  /* The chevron is a background image so the control keeps the native select behaviour;
+     it is encoded with currentColor's role played by a token, redrawn per theme below. */
+  background-image: linear-gradient(45deg, transparent 50%, var(--ink-3) 50%),
+                    linear-gradient(135deg, var(--ink-3) 50%, transparent 50%);
+  background-position: calc(100% - 18px) calc(50% + 1px), calc(100% - 13px) calc(50% + 1px);
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+select.co-select:hover { border-color: var(--accent); }
+/* Group is a combined view, not one of the companies, so it is marked as a state. */
+select.co-select.group { border-color: var(--accent); color: var(--accent); }
 
 /* ---------- masthead ---------- */
 .masthead {
@@ -193,6 +222,28 @@ input[type="date"] { font-size: 13px; }
 .opt .vl { margin-left: auto; color: var(--ink-3); font-size: 11.5px; flex: none; }
 .empty-opt { padding: 14px 10px; color: var(--ink-3); font-size: 13px; text-align: center; }
 
+/* The product filter is a two-level tree: the product group, and the item descriptions
+   inside it. A group on its own is too coarse a question here -- NAOH alone covers
+   several specifications at different strengths and prices, and "which spec is losing
+   money" cannot be asked of the group. Ticking a group means all of it; opening it and
+   ticking descriptions means just those. */
+.prow { display: flex; align-items: center; gap: 2px; }
+.prow .opt { flex: 1; min-width: 0; }
+button.twist {
+  font: inherit; background: none; border: 0; cursor: pointer; color: var(--ink-3);
+  padding: 5px 3px; line-height: 1; border-radius: 5px; flex: none; width: 18px;
+}
+button.twist:hover { color: var(--accent); background: var(--surface-2); }
+button.twist span { display: inline-block; font-size: 9px; transition: transform .12s ease; }
+button.twist[aria-expanded="true"] span { transform: rotate(90deg); }
+/* Children are indented under their group and set a step quieter, so two levels are never
+   read as one flat list of equals. */
+.kids { margin: 0 0 4px 19px; border-left: 1px solid var(--hairline-2); padding-left: 7px; }
+.opt.opt-k { font-size: 12px; padding: 5px 8px; }
+.opt-k .nm { color: var(--ink-2); }
+.opt-k .code { color: var(--ink-3); font-size: 10.5px; flex: none; margin-left: 6px; }
+.empty-kids { padding: 5px 8px; color: var(--ink-3); font-size: 11.5px; }
+
 /* ---------- KPI instrument cluster ---------- */
 .kpis {
   display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px;
@@ -243,7 +294,7 @@ input[type="date"] { font-size: 13px; }
    falling back to the same accent colour. */
 .c1 { --c: var(--s1); } .c2 { --c: var(--s2); } .c3 { --c: var(--s3); }
 .c4 { --c: var(--s4); } .c5 { --c: var(--s5); } .c6 { --c: var(--s6); }
-.c7 { --c: var(--s7); }
+.c7 { --c: var(--s7); } .c8 { --c: var(--s8); } .c9 { --c: var(--s9); }
 
 /* The icon sprite. Hidden root, symbols still resolve through <use>. Marks take their
    colour from CSS (currentColor), never a presentation attribute -- the same rule that
@@ -291,16 +342,23 @@ input[type="date"] { font-size: 13px; }
 .f-quick { grid-column: span 4; }
 .f-grain { grid-column: span 3; }
 .f-view { grid-column: span 2; }
-.f-cust { grid-column: span 3; }
-.f-groups { grid-column: span 7; }
+.f-cust { grid-column: span 7; }
+.f-groups { grid-column: span 3; }
 .f-reset { grid-column: span 2; }
+/* The product panel hangs off a grid cell, so that cell has to be the containing block
+   for it and must not clip it. */
+.f-groups { position: relative; }
 
-/* The Revenue band carries two dimensions the others do not, so it runs to three rows:
-   date 3 + quick 4 + grain 3 + view 2, then customer 3 + salesperson 3 + sector 3 +
-   reset 3, then product group across all twelve. Keep each row summing to 12. */
+/* The Revenue band carries two dimensions the others do not, so its second row is full:
+   date 3 + quick 4 + grain 3 + view 2, then customer 3 + salesperson 3 + product 3 +
+   reset 3. Sector is the fourth control on that row and would make it thirteen -- it fits
+   because Shortcut Dimension 3 is empty in BC, so that control hides itself and takes its
+   three columns with it. The day the dimension is populated this band wraps to a third
+   row; that is the intended behaviour, not a bug to pad around. Keep each row summing
+   to 12. */
 #panel-rev .f-cust, .f-sp, .f-sector { grid-column: span 3; }
 #panel-rev .f-reset { grid-column: span 3; }
-#panel-rev .f-groups { grid-column: span 12; }
+#panel-rev .f-groups { grid-column: span 3; }
 
 @media (max-width: 1080px) {
   .f-date, .f-quick, .f-grain, .f-cust, .f-sp, .f-sector { grid-column: span 6; }
@@ -470,6 +528,35 @@ tbody td:first-child, tfoot td:first-child { text-align: left; }
 tbody tr:hover td { background: color-mix(in srgb, var(--accent) 8%, transparent); }
 td.name { font-weight: 500; max-width: 300px; }
 td.name .code { color: var(--ink-3); font-weight: 400; font-size: 11.5px; margin-left: 7px; }
+
+/* The customer name is a disclosure control for its item breakdown. It has to cover the
+   cell's own padding, or the clickable area is a strip in the middle of a cell that
+   otherwise looks pressable. Colour is inherited: this is structure, not a link. */
+tbody td.name { padding: 0; }
+button.disc {
+  font: inherit; font-weight: inherit; color: inherit; background: none; border: 0;
+  cursor: pointer; width: 100%; text-align: left; padding: 10px 16px 10px 30px;
+  position: relative; display: block;
+}
+button.disc:hover { color: var(--accent); }
+button.disc .caret {
+  position: absolute; left: 13px; top: 50%; margin-top: -.55em;
+  font-size: 10px; color: var(--ink-3); transition: transform .12s ease;
+  display: inline-block;
+}
+button.disc:hover .caret { color: var(--accent); }
+button.disc[aria-expanded="true"] .caret { transform: rotate(90deg); }
+button.disc[aria-expanded="true"] { color: var(--accent); }
+
+/* An item line is subordinate to the customer above it and must read that way at a
+   glance, or a long breakdown looks like more customers. Indented past the caret,
+   lighter ink, and the figures dimmed a step -- but the same columns and the same
+   formatting, so a month can still be read straight down the grid. */
+tr.itemrow td.name.item { padding: 7px 16px 7px 30px; font-weight: 400; font-size: 12px; }
+tr.itemrow td.name.item .cn { color: var(--ink-2); }
+tr.itemrow td { padding-top: 7px; padding-bottom: 7px; }
+td.sub { color: var(--ink-2); font-weight: 400; font-size: 12px; }
+td.sub.pos, td.sub.neg { opacity: .8; }
 td.n { font-variant-numeric: tabular-nums; white-space: nowrap; }
 td.pos { color: var(--pos); }
 td.neg { color: var(--neg); }
@@ -586,7 +673,10 @@ footer .flag[role="note"] i { color: var(--ink); font-style: normal; font-weight
 </svg>
   <header class="masthead">
     <div>
-      <p class="eyebrow" id="co"></p>
+      <div class="cosel">
+        <label for="co-select">Company</label>
+        <select id="co-select" class="co-select" aria-label="Company"></select>
+      </div>
       <h1>Sales Margin Control</h1>
       <p class="sub">Volume, revenue and cost of sales by customer &mdash; posted sales value entries from Business Central.</p>
     </div>
@@ -651,13 +741,14 @@ footer .flag[role="note"] i { color: var(--ink); font-style: normal; font-weight
       </div>
     </div>
     <div class="field picker">
-      <label for="gpick">Product group</label>
+      <label for="gpick">Product</label>
       <button type="button" class="picker-btn" id="gpick" aria-expanded="false" aria-haspopup="true"
-              title="Gen. Prod. Posting Group on the value entry">
+              title="Gen. Prod. Posting Group on the value entry, and the item description within it">
         <span id="gpicklabel">All product groups</span><span class="caret">&#9660;</span>
       </button>
-      <div class="panel narrow" id="gppanel" hidden>
+      <div class="panel" id="gppanel" hidden>
         <div class="panel-head">
+          <input type="search" class="search-input" id="gpsearch" placeholder="Search group or description" aria-label="Search product group or item description">
           <div class="panel-acts">
             <button type="button" class="link" id="gpall">Select all</button>
             <button type="button" class="link" id="gpnone">Clear</button>
@@ -758,8 +849,11 @@ footer .flag[role="note"] i { color: var(--ink); font-style: normal; font-weight
       <div class="fgrid">
         <div><b>What is counted.</b> Sales deliveries, invoices, return receipts and credit memos; returns and credit memos subtract. Internal postings and delivery-charge lines are left out, as the latter earn revenue but carry no tonnage.</div>
         <div><b>Reading the table.</b> Months run left to right, each showing all six figures, with the period total on the right. Every column sorts. A dash means no trade that month.</div>
+        <div><b>Product filter.</b> Two levels. Ticking a <b>product group</b> takes all of it; opening the group with the arrow and ticking <b>item descriptions</b> takes only those &mdash; NAOH, for instance, covers several specifications at different strengths and prices. Unticking one description inside a whole group leaves the rest of the group selected. The figure beside each line is its revenue under the other filters, so it says what ticking it would actually add.</div>
+        <div><b>What they bought.</b> Click a customer name to open the items behind their figures, each shown across the same months and measures. The item lines add up to the customer line, and they follow whichever column you sorted by. GP % and price per MT are worked out from each item's own revenue and tonnage, so they do not add up &mdash; the same rule as everywhere else on this tab.</div>
         <div><b>Rounding.</b> Amounts are Singapore dollars, and month cells are abbreviated to thousands (K) or millions (M) to keep the table readable &mdash; hover any cell for the exact figure. Totals are worked out at full precision, so a column may differ by a cent from adding up the rounded figures on screen.</div>
         <div><b>Filters.</b> The posting date range, customer, salesperson and product group selections at the top drive everything on this tab &mdash; the four headline figures, the table and both charts all move together.</div>
+        <div><b>Company.</b> The selector above the tabs decides which company&rsquo;s ledger every figure on this page is read from, and <b>Group</b> shows both added together. Changing it clears the customer, salesperson and product group selections, since those differ between companies, and keeps the date range. The dashboard opens on April 2026, the period both companies trade in; earlier dates are available and return Chemical Industries only.</div>
         <div><b>The two charts share one scale</b> and one row order, so a product's revenue bar can be read straight across against its cost bar: wherever the lower bar is the longer one, that product sold below cost.</div>
       </div>
     </footer>
@@ -826,8 +920,23 @@ footer .flag[role="note"] i { color: var(--ink); font-style: normal; font-weight
         </div>
 
         <div class="field f-groups">
-          <label id="tr-gl"><svg class="ic"><use href="#ic-grid"/></svg>Product group</label>
-          <div class="ctl presets fill" role="group" aria-labelledby="tr-gl" id="tr-groups"></div>
+          <label for="tr-gpick"><svg class="ic"><use href="#ic-grid"/></svg>Product</label>
+          <div class="ctl">
+            <button type="button" class="picker-btn" id="tr-gpick" aria-expanded="false" aria-haspopup="true"
+                    title="Gen. Prod. Posting Group on the value entry, and the item description within it">
+              <span id="tr-gpicklabel">All product groups</span><span class="caret">&#9660;</span>
+            </button>
+          </div>
+          <div class="panel" id="tr-gppanel" hidden>
+            <div class="panel-head">
+              <input type="search" class="search-input" id="tr-gpsearch" placeholder="Search group or description" aria-label="Search product group or item description">
+              <div class="panel-acts">
+                <button type="button" class="link" id="tr-gpall">Select all</button>
+                <button type="button" class="link" id="tr-gpnone">Clear</button>
+              </div>
+            </div>
+            <div class="opts" id="tr-gpopts"></div>
+          </div>
         </div>
 
         <div class="field f-reset">
@@ -882,7 +991,8 @@ footer .flag[role="note"] i { color: var(--ink); font-style: normal; font-weight
       <div class="fgrid">
         <div><b>What is counted.</b> The same scope as the other tabs: sales deliveries, invoices, return receipts and credit memos, with internal postings and delivery-charge lines left out. Returns and credit memos <b>subtract</b>, so a period can show a negative figure &mdash; a real net return, not an error, and never flipped to positive.</div>
         <div><b>Reading the chart.</b> Height is tonnage in metric tonnes, left to right is time, and each line is one general product posting group. Hover anywhere on the plot for a crosshair and every group's figure at the nearest period &mdash; you do not have to hit the line itself.</div>
-        <div><b>The scale follows your selection.</b> NAOH is about three quarters of all tonnage, so while it is shown the other six lines sit almost flat. Untick it and the rest rescale. Colour stays with the product group either way, so hiding one never repaints the others.</div>
+                <div><b>Product filter.</b> Two levels. Ticking a <b>product group</b> draws the whole group as one line; opening it with the arrow and ticking <b>item descriptions</b> draws only those specifications &mdash; NAOH alone covers several, at different strengths and prices. The line keeps the group&rsquo;s colour either way. The figure beside each entry is its tonnage under this tab&rsquo;s other filters, so it says what ticking it would actually add.</div>
+        <div><b>The scale follows your selection.</b> NAOH is about three quarters of all tonnage, so while it is shown the other six lines sit almost flat. Deselect it in the product filter and the rest rescale. Colour stays with the product group either way, so hiding one never repaints the others.</div>
         <div><b>Filters.</b> The controls in this tile drive the chart and the table together, and the strip under them shows which are narrowing the view. They are <b>independent of the other tabs</b> &mdash; a customer filtered here does not narrow anything elsewhere.</div>
       </div>
     </footer>
@@ -1021,8 +1131,23 @@ footer .flag[role="note"] i { color: var(--ink); font-style: normal; font-weight
         </div>
 
         <div class="field f-groups">
-          <label id="rv-gl"><svg class="ic"><use href="#ic-grid"/></svg>Product group</label>
-          <div class="ctl presets fill" role="group" aria-labelledby="rv-gl" id="rv-groups"></div>
+          <label for="rv-gpick"><svg class="ic"><use href="#ic-grid"/></svg>Product</label>
+          <div class="ctl">
+            <button type="button" class="picker-btn" id="rv-gpick" aria-expanded="false" aria-haspopup="true"
+                    title="Gen. Prod. Posting Group on the value entry, and the item description within it">
+              <span id="rv-gpicklabel">All product groups</span><span class="caret">&#9660;</span>
+            </button>
+          </div>
+          <div class="panel" id="rv-gppanel" hidden>
+            <div class="panel-head">
+              <input type="search" class="search-input" id="rv-gpsearch" placeholder="Search group or description" aria-label="Search product group or item description">
+              <div class="panel-acts">
+                <button type="button" class="link" id="rv-gpall">Select all</button>
+                <button type="button" class="link" id="rv-gpnone">Clear</button>
+              </div>
+            </div>
+            <div class="opts" id="rv-gpopts"></div>
+          </div>
         </div>
 
         <div class="field f-reset">
@@ -1077,7 +1202,8 @@ footer .flag[role="note"] i { color: var(--ink); font-style: normal; font-weight
       <div class="fgrid">
         <div><b>What is counted.</b> The same scope as the other tabs: sales deliveries, invoices, return receipts and credit memos, with internal postings and delivery-charge lines left out. Returns and credit memos <b>subtract</b>, so a period can show a negative figure &mdash; a real net return, not an error, and never flipped to positive.</div>
         <div><b>Reading the chart.</b> Height is revenue in Singapore dollars, left to right is time, and each line is one general product posting group. Hover anywhere on the plot for a crosshair and every group's figure at the nearest period &mdash; you do not have to hit the line itself.</div>
-        <div><b>The scale follows your selection.</b> NAOH is around seventy per cent of revenue, so while it is shown the other six lines sit almost flat. Untick it and the rest rescale. Colour stays with the product group either way, so hiding one never repaints the others.</div>
+                <div><b>Product filter.</b> Two levels. Ticking a <b>product group</b> draws the whole group as one line; opening it with the arrow and ticking <b>item descriptions</b> draws only those specifications &mdash; NAOH alone covers several, at different strengths and prices. The line keeps the group&rsquo;s colour either way. The figure beside each entry is its revenue under this tab&rsquo;s other filters, so it says what ticking it would actually add.</div>
+        <div><b>The scale follows your selection.</b> NAOH is around seventy per cent of revenue, so while it is shown the other six lines sit almost flat. Deselect it in the product filter and the rest rescale. Colour stays with the product group either way, so hiding one never repaints the others.</div>
         <div><b>Filters.</b> The controls in this tile drive the chart and the table together, and the strip under them shows which are narrowing the view. They are <b>independent of the other tabs</b> &mdash; a customer filtered here does not narrow anything elsewhere.</div>
       </div>
     </footer>
@@ -1180,8 +1306,23 @@ footer .flag[role="note"] i { color: var(--ink); font-style: normal; font-weight
         </div>
 
         <div class="field f-groups">
-          <label id="gp-gl"><svg class="ic"><use href="#ic-grid"/></svg>Product group</label>
-          <div class="ctl presets fill" role="group" aria-labelledby="gp-gl" id="gp-groups"></div>
+          <label for="gp-gpick"><svg class="ic"><use href="#ic-grid"/></svg>Product</label>
+          <div class="ctl">
+            <button type="button" class="picker-btn" id="gp-gpick" aria-expanded="false" aria-haspopup="true"
+                    title="Gen. Prod. Posting Group on the value entry, and the item description within it">
+              <span id="gp-gpicklabel">All product groups</span><span class="caret">&#9660;</span>
+            </button>
+          </div>
+          <div class="panel" id="gp-gppanel" hidden>
+            <div class="panel-head">
+              <input type="search" class="search-input" id="gp-gpsearch" placeholder="Search group or description" aria-label="Search product group or item description">
+              <div class="panel-acts">
+                <button type="button" class="link" id="gp-gpall">Select all</button>
+                <button type="button" class="link" id="gp-gpnone">Clear</button>
+              </div>
+            </div>
+            <div class="opts" id="gp-gpopts"></div>
+          </div>
         </div>
 
         <div class="field f-reset">
@@ -1239,6 +1380,7 @@ footer .flag[role="note"] i { color: var(--ink); font-style: normal; font-weight
       <div class="fgrid">
         <div><b>What is counted.</b> The same scope as the other tabs: sales deliveries, invoices, return receipts and credit memos, with internal postings and delivery-charge lines left out. Returns and credit memos <b>subtract</b>, so a period can show a negative figure &mdash; a real net return, not an error, and never flipped to positive.</div>
         <div><b>Reading the chart.</b> Height is gross profit in Singapore dollars, above and below zero, left to right is time, and each line is one general product posting group. Hover anywhere on the plot for a crosshair and every group's figure at the nearest period &mdash; you do not have to hit the line itself.</div>
+        <div><b>Product filter.</b> Two levels. Ticking a <b>product group</b> draws the whole group as one line; opening it with the arrow and ticking <b>item descriptions</b> draws only those specifications &mdash; NAOH alone covers several, at different strengths and prices. The line keeps the group&rsquo;s colour either way. The figure beside each entry is its gross profit under this tab&rsquo;s other filters, so it says what ticking it would actually add.</div>
         <div><b>The scale follows your selection.</b> One or two groups carry most of the profit, and others sit below zero, so the scale is set by whichever you have on. Untick the largest and the rest rescale. Colour stays with the product group either way, so hiding one never repaints the others.</div>
         <div><b>Filters.</b> The controls in this tile drive the chart and the table together, and the strip under them shows which are narrowing the view. They are <b>independent of the other tabs</b> &mdash; a customer filtered here does not narrow anything elsewhere.</div>
       </div>
@@ -1283,6 +1425,9 @@ footer .flag[role="note"] i { color: var(--ink); font-style: normal; font-weight
   </div><!-- /panel-gp -->
 
   <footer id="notes-footer" hidden>
+    <div id="group-note" class="flag" hidden>
+      <div><b>Group is the two companies added together.</b> They also trade with each other &mdash; CI Manufacturing sells to Chemical Industries (Far East) Limited, and Chemical Industries sells back to CI Manufacturing &mdash; and that trade is counted on <b>both</b> sides here, once as each company&rsquo;s sale. Group revenue and tonnage are therefore <b>higher than the goods actually sold to outside customers</b>, by roughly S$19&nbsp;million of revenue over the full range. Each company on its own is unaffected. Read Group as the two ledgers combined, not as consolidated accounts.</div>
+    </div>
     <div id="mt-notes" class="flag" hidden></div>
   </footer>
 </div>
@@ -1319,10 +1464,78 @@ function shiftDays(iso, days) {
 
 /* Colour follows the product group, never its rank: the fixed group list is the
    slot order, so a filter that drops a group never repaints the survivors. */
-const SLOTS = ["--s1", "--s2", "--s3", "--s4", "--s5", "--s6", "--s7"];
+const SLOTS = ["--s1", "--s2", "--s3", "--s4", "--s5", "--s6", "--s7",
+               "--s8", "--s9"];
 const GROUPS = DATA.groups.slice();
 const classOf = {};
 GROUPS.forEach((g, i) => { classOf[g] = "c" + ((i % SLOTS.length) + 1); });
+
+/* ---------- company scope ---------- */
+/* The selector above the tabs picks ONE company or the Group. It is deliberately not a
+   filter like the others: it decides which company's ledger the page is reading, so it
+   sits outside the tabs and scopes every one of them at once.
+
+   Group is a PLAIN SUM of the companies, by decision. CIM sells to CIL (customer C0002)
+   and CIL sells to CIM (CI07) -- roughly S$19M between them -- and that trade is counted
+   in both legs, so Group revenue exceeds true external revenue by about that much. The
+   footer says so. Do not net it off here without changing the footer to match.
+
+   ROWS is materialised once per switch rather than tested inside every loop: six separate
+   passes read it and the payload runs to tens of thousands of rows. Everything downstream
+   reads ROWS, never DATA.rows -- a loop that reads DATA.rows ignores the selector. */
+const CO_GROUP = "__group__";
+const CO_LIST = (DATA.companies || []).slice();
+const CO_LABEL = {};
+CO_LIST.forEach((c) => { CO_LABEL[c.code] = c.label; });
+CO_LABEL[CO_GROUP] = "Group";
+const CO_BY_CODE = {};
+CO_LIST.forEach((c) => { CO_BY_CODE[c.code] = c; });
+
+let coCode = CO_LIST.some((c) => c.code === DATA.defaultCompany)
+  ? DATA.defaultCompany
+  : (CO_LIST.length ? CO_LIST[0].code : CO_GROUP);
+
+let ROWS = [];
+/* Codes actually present under the current company. The pickers list these rather than
+   the whole payload: with a company selected, offering the other company's 112 customers
+   at zero is the opposite of useful. */
+let CO_CUSTOMERS = [], SP_CODES = [], SECTORS = [], CO_GROUPS = [];
+/* group -> the item codes traded under it, for the margin tab's product tree. Built with
+   the rest of the scope because the answer differs per company. */
+let ITEMS_BY_GROUP = new Map();
+
+function applyCompanyScope() {
+  ROWS = coCode === CO_GROUP ? DATA.rows : DATA.rows.filter((r) => r[6] === coCode);
+  const cust = new Set(), sp = new Set(), sec = new Set(), grp = new Set();
+  for (const r of ROWS) { cust.add(r[0]); grp.add(r[1]); sp.add(r[3]); sec.add(r[4]); }
+  CO_CUSTOMERS = Object.keys(DATA.customers).filter((no) => cust.has(no));
+  CO_GROUPS = DATA.groups.filter((g) => grp.has(g));
+  SP_CODES = Object.keys(DATA.salespeople || {}).filter((c) => sp.has(c));
+  if (sp.has(SP_NONE)) SP_CODES.push(SP_NONE);
+  SECTORS = (DATA.sectors || []).filter((c) => sec.has(c));
+  if (sec.has(SECTOR_NONE)) SECTORS.push(SECTOR_NONE);
+
+  ITEMS_BY_GROUP = new Map();
+  const seenPair = new Set();
+  for (const r of ROWS) {
+    const pair = r[1] + "\u0000" + r[5];
+    if (seenPair.has(pair)) continue;
+    seenPair.add(pair);
+    if (!ITEMS_BY_GROUP.has(r[1])) ITEMS_BY_GROUP.set(r[1], []);
+    ITEMS_BY_GROUP.get(r[1]).push(r[5]);
+  }
+  for (const list of ITEMS_BY_GROUP.values()) {
+    list.sort((a, b) => itemName(a).localeCompare(itemName(b)));
+  }
+}
+
+/* Postings range for the current scope, for the masthead stamp. */
+function coRange() {
+  if (coCode !== CO_GROUP && CO_BY_CODE[coCode]) {
+    return [CO_BY_CODE[coCode].minDate, CO_BY_CODE[coCode].maxDate];
+  }
+  return [DATA.minDate, DATA.maxDate];
+}
 
 /* Dimension lookups derived from the payload. Shared: the margin tab's pickers and the
    trend tabs' dropdowns both read them, so they live here rather than inside either. */
@@ -1332,34 +1545,43 @@ GROUPS.forEach((g, i) => { classOf[g] = "c" + ((i % SLOTS.length) + 1); });
 const SP_NONE = "";
 const spName = (code) => code === SP_NONE ? "No salesperson" : (DATA.salespeople[code] || code);
 
-/* Salesperson codes actually present in the data, most valuable first is decided later;
-   the unassigned bucket always sorts last in the list build below. */
-const SP_CODES = (() => {
-  const seen = new Set(DATA.rows.map((r) => r[3]));
-  const codes = Object.keys(DATA.salespeople || {}).filter((c) => seen.has(c));
-  if (seen.has(SP_NONE)) codes.push(SP_NONE);
-  return codes;
-})();
+/* Salesperson codes present under the current company are rebuilt by
+   applyCompanyScope; the unassigned bucket always sorts last in the list build below. */
 
 /* Shortcut Dimension 3, shown as "Sector". BC currently returns it empty on every value
    entry -- Dimension_Set_ID is 0 there, so no dimension set is attached at all -- which
    leaves this a one-option list. The control hides itself below two options and will
    appear on its own the day the dimension is populated in Business Central. */
 const SECTOR_NONE = "";
-const SECTORS = (() => {
-  const seen = new Set(DATA.rows.map((r) => r[4]));
-  const list = (DATA.sectors || []).filter((c) => seen.has(c));
-  if (seen.has(SECTOR_NONE)) list.push(SECTOR_NONE);
-  return list;
-})();
 const sectorName = (c) => c === SECTOR_NONE ? "No sector" : c;
+
+/* Item descriptions, for the breakdown drawn under each customer in the monthly grid.
+   The payload guarantees an entry for every item code the rows carry, so this never
+   renders a blank line; a row with no item code at all still gets a readable label. */
+const ITEMS = DATA.items || {};
+const itemName = (code) => ITEMS[code] || code || "(no item)";
+
+// After itemName, not before: the scope builder sorts each group's items by description,
+// and a const is unreachable until its own declaration has run.
+applyCompanyScope();
 
 
 /* ---------- state ---------- */
 const state = {
-  from: DATA.minDate, to: DATA.maxDate, picked: new Set(), sp: new Set(), grp: new Set(),
+  from: DATA.defaultFrom || DATA.minDate, to: DATA.maxDate,
+  picked: new Set(), sp: new Set(),
+  /* The product tree is two sets, not one. `grp` holds groups ticked WHOLE; `item` holds
+     individual item codes ticked inside a group that is not. A row passes if either
+     matches, which is exactly what makes a parent tick mean "all of these" and a child
+     tick mean "just this one". Both empty is the default: no product filter at all. */
+  grp: new Set(), item: new Set(),
+  gpOpen: new Set(),   // which groups are expanded, kept across re-renders
   sort: "total:rev",  // "name", "total:<measure>", or "m:YYYY-MM:<measure>"
   dir: -1,
+  // Customer numbers whose item breakdown is open. Kept in state, not in the DOM, so a
+  // re-render for any other reason -- a filter, a sort -- leaves the rows the reader
+  // opened still open.
+  open: new Set(),
 };
 
 /* Every month shows all five measures side by side. Month cells use compact notation so a
@@ -1380,6 +1602,40 @@ function monthLabel(ym) {
 }
 const $ = (id) => document.getElementById(id);
 
+/* ---------- the product tree, shared by all four tabs ---------- */
+/* A row passes when nothing is ticked at either level, or when its GROUP is ticked whole,
+   or when its ITEM is ticked individually. The two levels are an OR: ticking NAOH takes
+   every NAOH spec, ticking two specs takes only those two.
+
+   Every tab keeps its OWN pair of Sets -- the margin tab's `state.grp`/`state.item`, each
+   trend tab's `st.groups`/`st.item` -- and hands them here. The tabs stay independent;
+   the meaning of a tick does not. */
+function productPasses(grpSet, itemSet, grp, item) {
+  if (!grpSet.size && !itemSet.size) return true;
+  return grpSet.has(grp) || itemSet.has(item);
+}
+function inProduct(grp, item) {
+  return productPasses(state.grp, state.item, grp, item);
+}
+
+/* Empty means everything, and so does every group ticked whole with no item narrowing.
+   Both are the default view, so both must read as "All product groups" and leave the
+   filter pill unlit -- otherwise Select all lights a pill that narrows nothing. */
+function productIsAll(grpSet, itemSet) {
+  if (!grpSet.size && !itemSet.size) return true;
+  return !itemSet.size && grpSet.size === CO_GROUPS.length
+      && CO_GROUPS.every((g) => grpSet.has(g));
+}
+
+/* The groups a selection puts on screen, in the fixed palette order. Used by the trend
+   tabs to decide which lines exist; a group is present if it is ticked whole or if any of
+   its items is ticked individually. */
+function selectedGroups(grpSet, itemSet) {
+  if (!grpSet.size && !itemSet.size) return CO_GROUPS.slice();
+  return CO_GROUPS.filter((g) => grpSet.has(g) ||
+    (ITEMS_BY_GROUP.get(g) || []).some((c) => itemSet.has(c)));
+}
+
 /* ---------- filtered aggregation ---------- */
 /* Price per MT and GP % are DERIVED, never summed: each is worked out from the revenue
    and tonnage of the cell it belongs to. Averaging a month's rates would let a tiny month
@@ -1393,19 +1649,27 @@ function compute() {
   const byCust = new Map(), byGrpRev = new Map(), byGrpCog = new Map();
   const monthSet = new Set();
   let mt = 0, rev = 0, cogs = 0;
-  for (const [no, grp, date, sp, sector, kg, r, c] of DATA.rows) {
+  for (const [no, grp, date, sp, sector, item, co, kg, r, c] of ROWS) {
     if (date < state.from || date > state.to) continue;
     if (state.picked.size && !state.picked.has(no)) continue;
     if (state.sp.size && !state.sp.has(sp)) continue;
-    if (state.grp.size && !state.grp.has(grp)) continue;
+    if (!inProduct(grp, item)) continue;
     const ym = date.slice(0, 7);
     monthSet.add(ym);
     let a = byCust.get(no);
-    if (!a) { a = { t: [0, 0, 0], m: new Map() }; byCust.set(no, a); }
+    if (!a) { a = { t: [0, 0, 0], m: new Map(), i: new Map() }; byCust.set(no, a); }
     a.t[0] += kg; a.t[1] += r; a.t[2] += c;
     let cell = a.m.get(ym);
     if (!cell) { cell = [0, 0, 0]; a.m.set(ym, cell); }
     cell[0] += kg; cell[1] += r; cell[2] += c;
+    // The same accumulation one level down, so the breakdown under a customer is built
+    // from exactly the rows that made their total and can never disagree with it.
+    let it = a.i.get(item);
+    if (!it) { it = { t: [0, 0, 0], m: new Map() }; a.i.set(item, it); }
+    it.t[0] += kg; it.t[1] += r; it.t[2] += c;
+    let icell = it.m.get(ym);
+    if (!icell) { icell = [0, 0, 0]; it.m.set(ym, icell); }
+    icell[0] += kg; icell[1] += r; icell[2] += c;
     mt += kg; rev += r; cogs += c;
     byGrpRev.set(grp, (byGrpRev.get(grp) || 0) + r);
     byGrpCog.set(grp, (byGrpCog.get(grp) || 0) + c);
@@ -1415,11 +1679,29 @@ function compute() {
   const rows = [];
   for (const [no, a] of byCust) {
     const [kg, r, c] = a.t;
-    // "Total in KG must not be 0" — a customer with no tonnage in range is not a sale.
-    if (kg === 0) continue;
+    // Drop a customer only when they moved NOTHING in range -- no tonnage, no value.
+    // Tonnage alone used to be the test, on the reasoning that a customer with no MT is
+    // not a sale. That holds for a chemical shipment and fails for a service: CIL bills
+    // MAINTENANCE and MATERIAL that carry revenue and no weight, and dropping those rows
+    // hid real revenue from the grid while the KPI tile above it still counted them, so
+    // the two disagreed. The grid must sum to the tiles; the harness asserts it.
+    if (kg === 0 && r === 0 && c === 0) continue;
     const byMonth = new Map();
     for (const [ym, v] of a.m) byMonth.set(ym, measures(v[0], v[1], v[2]));
-    rows.push(Object.assign({ no, name: DATA.customers[no] || no, byMonth }, measures(kg, r, c)));
+    // Item lines are shaped exactly like a customer row -- name, byMonth and the six
+    // measures -- so the sort comparator and the cell renderer take either without a
+    // branch. A customer with no tonnage is dropped above; an item line is not, because
+    // an item that only ever carried a credit is part of how that total came about.
+    const items = [];
+    for (const [code, it] of a.i) {
+      const ibm = new Map();
+      for (const [ym, v] of it.m) ibm.set(ym, measures(v[0], v[1], v[2]));
+      items.push(Object.assign(
+        { no: code, name: itemName(code), byMonth: ibm },
+        measures(it.t[0], it.t[1], it.t[2])));
+    }
+    rows.push(Object.assign({ no, name: DATA.customers[no] || no, byMonth, items },
+                            measures(kg, r, c)));
   }
 
   // Column totals, summed from the same rows the table shows so the footer always
@@ -1529,7 +1811,9 @@ function renderTable(m) {
 
   const rows = m.rows.slice();
   const k = state.sort, d = state.dir;
-  rows.sort((x, y) => {
+  // Item lines are shaped like customer rows, so one comparator orders both and the
+  // breakdown follows whichever column the reader sorted the grid by.
+  const cmp = (x, y) => {
     if (k === "name") return d * x.name.localeCompare(y.name);
     const xv = val(x, k), yv = val(y, k);
     // Months a customer did not trade in sort below the ones they did.
@@ -1537,7 +1821,8 @@ function renderTable(m) {
     if (xv === undefined) return 1;
     if (yv === undefined) return -1;
     return d * (xv - yv) || x.name.localeCompare(y.name);
-  });
+  };
+  rows.sort(cmp);
 
   // ---- header: a month band over a row of measure columns ----
   const bands = document.createElement("tr");
@@ -1634,29 +1919,65 @@ function renderTable(m) {
     return td;
   };
 
-  for (const row of rows) {
-    const tr = document.createElement("tr");
-    const nameCell = document.createElement("td");
-    nameCell.className = "name";
-    nameCell.innerHTML = '<span class="cn"></span><span class="code"></span>';
-    nameCell.querySelector(".cn").textContent = row.name;
-    nameCell.querySelector(".code").textContent = row.no;
-    tr.appendChild(nameCell);
-
+  // One measure strip -- every month plus the Total band -- for a customer row or an
+  // item line, which carry the same shape. `cls` tints the whole strip so an item line
+  // stays visibly subordinate to the customer it sits under.
+  const addStrip = (tr, row, label, extra) => {
     months.forEach((ym, gi) => {
       const v = row.byMonth.get(ym);
       SUBS.forEach((sb, i) => {
-        const td = cell(v, sb, i, gi % 2 ? "alt" : "", sb.cell);
-        if (v) attachCellTip(td, row.name, ym, v);
+        const td = cell(v, sb, i, (gi % 2 ? "alt" : "") + extra, sb.cell);
+        if (v) attachCellTip(td, label, ym, v);
         tr.appendChild(td);
       });
     });
     SUBS.forEach((sb, i) => {
-      const td = cell(row, sb, i, "tot", sb.tot);
-      attachCellTip(td, row.name, null, row);
+      const td = cell(row, sb, i, "tot" + extra, sb.tot);
+      attachCellTip(td, label, null, row);
       tr.appendChild(td);
     });
+  };
+
+  for (const row of rows) {
+    const tr = document.createElement("tr");
+    const nameCell = document.createElement("td");
+    nameCell.className = "name";
+    const items = (row.items || []).slice().sort(cmp);
+    const isOpen = state.open.has(row.no);
+    // The disclosure is a real button so the breakdown is reachable from the keyboard,
+    // and aria-expanded says which way it is pointing.
+    const tog = document.createElement("button");
+    tog.type = "button";
+    tog.className = "disc";
+    tog.setAttribute("aria-expanded", isOpen ? "true" : "false");
+    tog.setAttribute("aria-label",
+      (isOpen ? "Hide" : "Show") + " items for " + row.name);
+    tog.innerHTML = '<span class="caret" aria-hidden="true">▸</span>' +
+      '<span class="cn"></span><span class="code"></span>';
+    tog.querySelector(".cn").textContent = row.name;
+    tog.querySelector(".code").textContent = row.no;
+    tog.addEventListener("click", () => {
+      if (state.open.has(row.no)) state.open.delete(row.no); else state.open.add(row.no);
+      render();
+    });
+    nameCell.appendChild(tog);
+    tr.appendChild(nameCell);
+    addStrip(tr, row, row.name, "");
     tb.appendChild(tr);
+
+    if (!isOpen) continue;
+    for (const it of items) {
+      const itr = document.createElement("tr");
+      itr.className = "itemrow";
+      const inc = document.createElement("td");
+      inc.className = "name item";
+      inc.innerHTML = '<span class="cn"></span><span class="code"></span>';
+      inc.querySelector(".cn").textContent = it.name;
+      inc.querySelector(".code").textContent = it.no;
+      itr.appendChild(inc);
+      addStrip(itr, it, row.name + " — " + it.name, " sub");
+      tb.appendChild(itr);
+    }
   }
 
   // ---- footer ----
@@ -1723,15 +2044,33 @@ function attachCellTip(td, name, ym, v) {
    option would always read zero. DIM is the row index -- 0 customer, 1 group, 3 salesperson. */
 function optionTotals(dim) {
   const totals = new Map();
-  for (const row of DATA.rows) {
+  for (const row of ROWS) {
     const date = row[2];
     if (date < state.from || date > state.to) continue;
     if (dim !== 0 && state.picked.size && !state.picked.has(row[0])) continue;
-    if (dim !== 1 && state.grp.size && !state.grp.has(row[1])) continue;
+    if (dim !== 1 && !inProduct(row[1], row[5])) continue;
     if (dim !== 3 && state.sp.size && !state.sp.has(row[3])) continue;
-    totals.set(row[dim], (totals.get(row[dim]) || 0) + row[6]);
+    totals.set(row[dim], (totals.get(row[dim]) || 0) + row[8]);
   }
   return totals;
+}
+
+/* Both levels of the product tree at once, under every filter EXCEPT the tree itself --
+   the same rule as optionTotals, which cannot serve this because the tree is keyed at two
+   levels. Items are keyed by group and code together, so an item code appearing under two
+   groups stays two separate leaves rather than one shared, double-counted row. */
+function productTotals() {
+  const byGroup = new Map(), byItem = new Map();
+  for (const row of ROWS) {
+    const date = row[2];
+    if (date < state.from || date > state.to) continue;
+    if (state.picked.size && !state.picked.has(row[0])) continue;
+    if (state.sp.size && !state.sp.has(row[3])) continue;
+    byGroup.set(row[1], (byGroup.get(row[1]) || 0) + row[8]);
+    const k = row[1] + "\u0000" + row[5];
+    byItem.set(k, (byItem.get(k) || 0) + row[8]);
+  }
+  return { byGroup, byItem };
 }
 
 /* One option row builder for both panels. `set` is mutated in place rather than
@@ -1765,7 +2104,7 @@ function fillOpts(box, list, set, emptyMsg) {
 function renderOpts() {
   const q = $("search").value.trim().toLowerCase();
   const totals = optionTotals(0);
-  const list = Object.keys(DATA.customers)
+  const list = CO_CUSTOMERS
     .map((no) => ({ k: no, name: DATA.customers[no], v: totals.get(no) || 0 }))
     .filter((c) => !q || c.name.toLowerCase().includes(q) || c.k.toLowerCase().includes(q))
     .sort((a, b) => b.v - a.v || a.name.localeCompare(b.name));
@@ -1782,12 +2121,166 @@ function renderSpOpts() {
 }
 
 /* Product groups keep their fixed palette slot here, so a swatch in this list is the same
-   colour as that group's bar. Listed in the fixed group order rather than by value, which
-   is the order the charts use and the pairing the palette was validated on. */
+   colour as that group's bar or line. Listed in the fixed group order rather than by
+   value, which is the order the charts use and the pairing the palette was validated on.
+
+   ONE renderer for all four tabs. It is a tree, not a list, so it does not go through
+   fillOpts; and it owns no state -- the caller hands it the two Sets to read and mutate,
+   the totals to show, and what to do after a change. A parent is checked when its group
+   is ticked whole and INDETERMINATE when only some of its items are, which is the only
+   honest way to draw "part of NAOH".
+
+   o = { box, search, grpSet, itemSet, openSet, totals, fmt, onChange, emptyMsg } */
+function renderProductTree(o) {
+  const q = (o.search ? o.search.value : "").trim().toLowerCase();
+  const box = o.box;
+  // Ticking a box rebuilds the list, which would drop keyboard focus on the floor. Each
+  // control carries a stable key so the same one can be focused again afterwards.
+  const active = document.activeElement;
+  const focusKey = active && active.dataset ? active.dataset.pkey : null;
+  box.textContent = "";
+
+  const groups = CO_GROUPS.map((g) => {
+    const items = (ITEMS_BY_GROUP.get(g) || []).map((code) => ({
+      code: code, name: itemName(code),
+      v: o.totals.byItem.get(g + "\u0000" + code) || 0,
+    }));
+    const hitName = !q || g.toLowerCase().includes(q);
+    // A group survives the search if its own name matches or any description under it
+    // does; when only a description matched, the group opens so the hit is visible.
+    const hits = hitName ? items : items.filter(
+      (it) => it.name.toLowerCase().includes(q) || it.code.toLowerCase().includes(q));
+    return { g: g, items: items, shown: hits, v: o.totals.byGroup.get(g) || 0,
+             match: hitName || hits.length > 0, forced: !hitName && hits.length > 0 };
+  }).filter((r) => r.match);
+
+  if (!groups.length) {
+    box.innerHTML = '<p class="empty-opt"></p>';
+    box.querySelector(".empty-opt").textContent = q
+      ? "No product group or description matches that search."
+      : (o.emptyMsg || "No product group in this data.");
+    return;
+  }
+
+  const fmt = o.fmt || compact;
+  for (const row of groups) {
+    const whole = o.grpSet.has(row.g);
+    const picked = row.items.filter((it) => o.itemSet.has(it.code)).length;
+    const open = row.forced || o.openSet.has(row.g);
+    let kids = null;   // built below; the twist handler closes over it
+
+    const pr = document.createElement("div");
+    pr.className = "prow";
+    const tw = document.createElement("button");
+    tw.type = "button";
+    tw.className = "twist";
+    tw.setAttribute("aria-expanded", open ? "true" : "false");
+    tw.setAttribute("aria-label",
+      (open ? "Hide" : "Show") + " item descriptions in " + row.g);
+    tw.innerHTML = '<span aria-hidden="true">\u25B8</span>';
+    tw.addEventListener("click", () => {
+      // Toggled in place rather than by re-rendering: opening a group changes no figure,
+      // so tearing the list down would only lose the reader's focus and scroll. Read the
+      // rendered state, not the Set: a search hit forces a group open without putting it
+      // in openSet, and toggling off the Set would then be a no-op click.
+      const now = tw.getAttribute("aria-expanded") !== "true";
+      if (now) o.openSet.add(row.g); else o.openSet.delete(row.g);
+      tw.setAttribute("aria-expanded", now ? "true" : "false");
+      tw.setAttribute("aria-label",
+        (now ? "Hide" : "Show") + " item descriptions in " + row.g);
+      if (kids) kids.hidden = !now;
+    });
+    pr.appendChild(tw);
+
+    const lab = document.createElement("label");
+    lab.className = "opt";
+    lab.innerHTML = '<input type="checkbox"><span class="sw ' + classOf[row.g] +
+      '"></span><span class="nm"></span><span class="vl"></span>';
+    const cb = lab.querySelector("input");
+    cb.dataset.pkey = "g:" + row.g;
+    cb.checked = whole;
+    cb.indeterminate = !whole && picked > 0;
+    lab.querySelector(".nm").textContent = row.g;
+    lab.querySelector(".vl").textContent = row.v ? fmt(row.v) : "\u2014";
+    cb.addEventListener("change", () => {
+      // Ticking a parent means the whole group, so any part-selection under it is cleared
+      // rather than left behind to narrow a group the reader just asked for in full.
+      for (const it of row.items) o.itemSet.delete(it.code);
+      if (whole) o.grpSet.delete(row.g); else o.grpSet.add(row.g);
+      o.onChange();
+    });
+    pr.appendChild(lab);
+    box.appendChild(pr);
+
+    // Children are always built and hidden when collapsed, so the twist above can show
+    // them without a re-render. The lists are small: 175 leaves across all of CIL.
+    kids = document.createElement("div");
+    kids.className = "kids";
+    kids.hidden = !open;
+    if (!row.shown.length) {
+      const p = document.createElement("p");
+      p.className = "empty-kids";
+      p.textContent = "No item under this group.";
+      kids.appendChild(p);
+    }
+    for (const it of row.shown) {
+      const kl = document.createElement("label");
+      kl.className = "opt opt-k";
+      kl.innerHTML = '<input type="checkbox"><span class="nm"></span>' +
+        '<span class="code"></span><span class="vl"></span>';
+      const kb = kl.querySelector("input");
+      kb.dataset.pkey = "i:" + row.g + "|" + it.code;
+      // A child of a whole-group tick reads as checked: the group covers it.
+      kb.checked = whole || o.itemSet.has(it.code);
+      kl.querySelector(".nm").textContent = it.name;
+      kl.querySelector(".code").textContent = it.code;
+      kl.querySelector(".vl").textContent = it.v ? fmt(it.v) : "\u2014";
+      kb.addEventListener("change", () => {
+        if (whole) {
+          // Unticking one item out of a whole group becomes "every item except this one",
+          // which is the only reading that keeps the checkbox honest.
+          o.grpSet.delete(row.g);
+          for (const other of row.items) {
+            if (other.code !== it.code) o.itemSet.add(other.code);
+          }
+        } else if (o.itemSet.has(it.code)) {
+          o.itemSet.delete(it.code);
+        } else {
+          o.itemSet.add(it.code);
+        }
+        o.onChange();
+      });
+      kids.appendChild(kl);
+    }
+    box.appendChild(kids);
+  }
+
+  if (focusKey) {
+    for (const el of box.querySelectorAll("[data-pkey]")) {
+      if (el.dataset.pkey === focusKey) { el.focus(); break; }
+    }
+  }
+}
+
+/* The label a product picker's button shows, for whichever pair of Sets it reads. Two
+   levels, so it has to say which one is narrowing: "NAOH" and "3 items" are very
+   different filters and a bare count of groups describes neither. */
+function productLabel(grpSet, itemSet) {
+  if (productIsAll(grpSet, itemSet)) return "All product groups";
+  const bits = [];
+  if (grpSet.size === 1) bits.push([...grpSet][0]);
+  else if (grpSet.size > 1) bits.push(grpSet.size + " groups");
+  if (itemSet.size === 1) bits.push(itemName([...itemSet][0]));
+  else if (itemSet.size > 1) bits.push(itemSet.size + " items");
+  return bits.length ? bits.join(" + ") : "All product groups";
+}
+
 function renderGpOpts() {
-  const totals = optionTotals(1);
-  const list = DATA.groups.map((g) => ({ k: g, name: g, v: totals.get(g) || 0, cls: classOf[g] }));
-  fillOpts($("gpopts"), list, state.grp, "No product group in this data.");
+  renderProductTree({
+    box: $("gpopts"), search: $("gpsearch"),
+    grpSet: state.grp, itemSet: state.item, openSet: state.gpOpen,
+    totals: productTotals(), fmt: compact, onChange: render,
+  });
 }
 
 function renderPickLabel() {
@@ -1805,12 +2298,8 @@ function renderPickLabel() {
     : sn === 1 ? spName([...state.sp][0])
     : sn + " salespeople selected";
 
-  const gn = state.grp.size;
-  $("gpick").classList.toggle("on", gn > 0);
-  $("gpicklabel").textContent = gn === 0
-    ? "All product groups"
-    : gn === 1 ? [...state.grp][0]
-    : gn + " product groups selected";
+  $("gpick").classList.toggle("on", !productIsAll(state.grp, state.item));
+  $("gpicklabel").textContent = productLabel(state.grp, state.item);
 }
 
 /* ---------- presets ---------- */
@@ -1928,9 +2417,14 @@ function niceMax(v) {
 
 function createTrend(cfg) {
   const id = (suffix) => cfg.p + "-" + suffix;
+  /* `groups` and `item` are this tab's own half of the product tree, and they follow the
+     margin tab's convention: BOTH EMPTY MEANS EVERYTHING. They used to start as every
+     group explicitly, which cannot express "all of NAOH plus one spec of HCL" and made
+     the all-selected default light its own filter pill. */
   const st = {
-    from: DATA.minDate, to: DATA.maxDate,
-    groups: new Set(DATA.groups), customers: new Set(), grain: "month", view: "chart",
+    from: DATA.defaultFrom || DATA.minDate, to: DATA.maxDate,
+    groups: new Set(), item: new Set(), gpOpen: new Set(),
+    customers: new Set(), grain: "month", view: "chart",
   };
   /* Optional extra dimensions, declared per measure. Each gets its own Set, its own
      dropdown and its own pill; a further one is another entry in cfg.dims. */
@@ -1944,7 +2438,7 @@ function createTrend(cfg) {
   function data() {
     const G = GRAINS[st.grain];
     const keys = new Set(), byGrp = new Map();
-    for (const row of DATA.rows) {
+    for (const row of ROWS) {
       const date = row[2];
       if (date < st.from || date > st.to) continue;
       const k = G.key(date);
@@ -1956,14 +2450,14 @@ function createTrend(cfg) {
       }
       if (skip) continue;
       const grp = row[1];
-      if (!st.groups.has(grp)) continue;
+      if (!productPasses(st.groups, st.item, grp, row[5])) continue;
       let m = byGrp.get(grp);
       if (!m) { m = new Map(); byGrp.set(grp, m); }
       m.set(k, (m.get(k) || 0) + cfg.value(row));
     }
     const periods = Array.from(keys).sort();
     // Fixed group order, never by value: legend, chips and lines must agree with the bars.
-    const series = DATA.groups.filter((g) => st.groups.has(g)).map((g) => {
+    const series = selectedGroups(st.groups, st.item).map((g) => {
       const m = byGrp.get(g) || new Map();
       const pts = periods.map((k) => m.get(k) || 0);
       return { g, cls: classOf[g], pts, total: pts.reduce((a, b) => a + b, 0) };
@@ -1991,7 +2485,7 @@ function createTrend(cfg) {
     $(id("hint")).textContent =
       cfg.noun + " per " + G.label.toLowerCase() + ", one line per general product posting group · " +
       niceDate(st.from) + " – " + niceDate(st.to) + " · " +
-      d.series.length + " of " + DATA.groups.length + " groups" +
+      d.series.length + " of " + CO_GROUPS.length + " groups" +
       (st.customers.size ? " · " + st.customers.size + " customer" +
         (st.customers.size > 1 ? "s" : "") : "") +
       " · " + cfg.full(grand) + " total" +
@@ -2132,10 +2626,10 @@ function createTrend(cfg) {
      list wants to know. */
   function custTotals() {
     const totals = new Map();
-    for (const row of DATA.rows) {
+    for (const row of ROWS) {
       const date = row[2];
       if (date < st.from || date > st.to) continue;
-      if (!st.groups.has(row[1])) continue;
+      if (!productPasses(st.groups, st.item, row[1], row[5])) continue;
       let skip = false;
       for (const dm of DIMS) {
         if (st[dm.key].size && !st[dm.key].has(row[dm.idx])) { skip = true; break; }
@@ -2181,14 +2675,44 @@ function createTrend(cfg) {
     }
   }
 
+  /* Both levels of this tab's product tree, under its other filters but not under itself.
+     Measured in this tab's own measure, not revenue: on the MT tab the figure beside a
+     description is its tonnage. */
+  function productTotalsT() {
+    const byGroup = new Map(), byItem = new Map();
+    for (const row of ROWS) {
+      const date = row[2];
+      if (date < st.from || date > st.to) continue;
+      if (st.customers.size && !st.customers.has(row[0])) continue;
+      let skip = false;
+      for (const dm of DIMS) {
+        if (st[dm.key].size && !st[dm.key].has(row[dm.idx])) { skip = true; break; }
+      }
+      if (skip) continue;
+      byGroup.set(row[1], (byGroup.get(row[1]) || 0) + cfg.value(row));
+      const k = row[1] + "\u0000" + row[5];
+      byItem.set(k, (byItem.get(k) || 0) + cfg.value(row));
+    }
+    return { byGroup, byItem };
+  }
+
+  function renderProductOpts() {
+    renderProductTree({
+      box: $(id("gpopts")), search: $(id("gpsearch")),
+      grpSet: st.groups, itemSet: st.item, openSet: st.gpOpen,
+      totals: productTotalsT(), fmt: cfg.brief,
+      onChange: () => { render(); sync(); },
+    });
+  }
+
   /* One option list per extra dimension. Short lists, so no search box: just the options,
      each with its value under the tab's other filters, and Select all / Clear. */
   function dimTotals(dm) {
     const totals = new Map();
-    for (const row of DATA.rows) {
+    for (const row of ROWS) {
       const date = row[2];
       if (date < st.from || date > st.to) continue;
-      if (!st.groups.has(row[1])) continue;
+      if (!productPasses(st.groups, st.item, row[1], row[5])) continue;
       if (st.customers.size && !st.customers.has(row[0])) continue;
       let skip = false;
       for (const other of DIMS) {
@@ -2343,6 +2867,29 @@ function createTrend(cfg) {
     host.appendChild(tbody);
   }
 
+  /* The company changed under this tab. Selections are per-company -- a customer or a
+     salesperson picked in one company usually does not exist in the other, and carrying
+     one over silently would show an empty chart with a lit pill and no explanation -- so
+     they are cleared. The DATE RANGE is not: it is a question about time, and it means
+     the same thing whichever ledger is being read. Sets are mutated, never reassigned,
+     because the option listeners are bound to the objects. */
+  function recompany() {
+    // Mutate, never reassign: the tree's listeners are handed these very objects.
+    st.groups.clear();
+    st.item.clear();
+    st.gpOpen.clear();
+    st.customers.clear();
+    for (const dm of DIMS) st[dm.key].clear();
+    $(id("gpsearch")).value = "";
+    if (!$(id("gppanel")).hidden) renderProductOpts();
+    for (const dm of DIMS) {
+      const f = $(id(dm.key + "pick")).closest(".field");
+      if (f) f.hidden = dm.options().length < 2;
+    }
+    render();
+    sync();
+  }
+
   function build() {
     const host = $(id("presets"));
     for (const pr of PRESETS) {
@@ -2371,21 +2918,20 @@ function createTrend(cfg) {
       grh.appendChild(b);
     }
 
-    const gh = $(id("groups"));
-    for (const g of DATA.groups) {
-      const b = document.createElement("button");
-      b.type = "button";
-      b.className = "chip";
-      b.dataset.g = g;
-      b.innerHTML = '<span class="sw ' + classOf[g] + '"></span><span class="gn"></span>';
-      b.querySelector(".gn").textContent = g;
-      b.addEventListener("click", () => {
-        if (st.groups.has(g)) st.groups.delete(g); else st.groups.add(g);
-        render();
-        sync();
-      });
-      gh.appendChild(b);
-    }
+    $(id("gpsearch")).addEventListener("input", () => renderProductOpts());
+    // Select all is every group WHOLE; Clear empties both levels back to the default.
+    $(id("gpall")).addEventListener("click", () => {
+      st.item.clear();
+      for (const g of CO_GROUPS) st.groups.add(g);
+      render();
+      sync();
+    });
+    $(id("gpnone")).addEventListener("click", () => {
+      st.groups.clear();
+      st.item.clear();
+      render();
+      sync();
+    });
 
     for (const inp of [$(id("from")), $(id("to"))]) { inp.min = DATA.minDate; inp.max = DATA.maxDate; }
     const onDate = () => {
@@ -2432,13 +2978,16 @@ function createTrend(cfg) {
     }
 
     $(id("reset")).addEventListener("click", () => {
-      st.from = DATA.minDate;
+      st.from = DATA.defaultFrom || DATA.minDate;
       st.to = DATA.maxDate;
       st.grain = "month";
-      st.groups = new Set(DATA.groups);
-      st.customers.clear();          // mutate: the option listeners hold this object
+      st.groups.clear();             // mutate: the option listeners hold these objects
+      st.item.clear();
+      st.gpOpen.clear();
+      st.customers.clear();
       for (const dm of DIMS) st[dm.key].clear();
       $(id("search")).value = "";
+      $(id("gpsearch")).value = "";
       render();
       sync();
     });
@@ -2457,14 +3006,14 @@ function createTrend(cfg) {
     lead.appendChild(document.createTextNode("Showing"));
     host.appendChild(lead);
 
-    const wholeRange = st.from === DATA.minDate && st.to === DATA.maxDate;
-    const allGroups = st.groups.size === DATA.groups.length;
+    const wholeRange = st.from === (DATA.defaultFrom || DATA.minDate)
+                    && st.to === DATA.maxDate;
+    const allGroups = productIsAll(st.groups, st.item);
     const pills = [
       ["ic-cal", "Dates", wholeRange ? "all dates" : niceDate(st.from) + " – " + niceDate(st.to), !wholeRange],
       ["ic-layers", "Grain", GRAINS[st.grain].label, false],
-      ["ic-grid", "Groups", allGroups ? "all " + DATA.groups.length
-        : st.groups.size === 1 ? [...st.groups][0]
-        : st.groups.size + " of " + DATA.groups.length, !allGroups],
+      ["ic-grid", "Product", allGroups ? "all " + CO_GROUPS.length + " groups"
+        : productLabel(st.groups, st.item), !allGroups],
       ["ic-user", "Customers", st.customers.size === 0 ? "all"
         : st.customers.size === 1 ? (DATA.customers[[...st.customers][0]] || "1 selected")
         : st.customers.size + " selected", st.customers.size > 0],
@@ -2516,9 +3065,11 @@ function createTrend(cfg) {
     document.querySelectorAll("#" + id("grain") + " .chip").forEach((b) => {
       b.setAttribute("aria-pressed", String(st.grain === b.dataset.grain));
     });
-    document.querySelectorAll("#" + id("groups") + " .chip").forEach((b) => {
-      b.setAttribute("aria-pressed", String(st.groups.has(b.dataset.g)));
-    });
+    // The product picker replaced the group chip row, so what needs syncing is its button
+    // label and whether it is lit, plus the open panel if the reader is looking at it.
+    $(id("gpick")).classList.toggle("on", !allGroups);
+    $(id("gpicklabel")).textContent = productLabel(st.groups, st.item);
+    if (!$(id("gppanel")).hidden) renderProductOpts();
     renderActive();
   }
 
@@ -2527,6 +3078,9 @@ function createTrend(cfg) {
   const panels = [{
     btn: id("pick"), panel: id("panel"),
     onOpen: () => { renderCustOpts(); $(id("search")).focus(); },
+  }, {
+    btn: id("gpick"), panel: id("gppanel"),
+    onOpen: () => { renderProductOpts(); $(id("gpsearch")).focus(); },
   }];
   for (const dm of DIMS) {
     panels.push({
@@ -2535,15 +3089,18 @@ function createTrend(cfg) {
     });
   }
 
-  return { cfg, st, data, render, build, sync, panels };
+  return { cfg, st, data, render, build, sync, panels, recompany };
 }
 
-/* Row shape is [customer, group, date, salesperson, kg, revenue, cost]. Tonnage is stored
-   in kilograms; revenue is already display-positive Singapore dollars. */
+/* Row shape is
+   [customer, group, date, salesperson, sector, item, company, kg, revenue, cost].
+   Tonnage is stored in kilograms; revenue is already display-positive Singapore dollars.
+   Dimensions are only ever APPENDED, so every earlier index survives a new one -- but each
+   one pushes the three measures along, which is why these read 7/8/9 rather than 4/5/6. */
 const TRENDS = {
   mt: createTrend({
     p: "tr", noun: "Tonnage shipped", axis: "MT", totalCol: "Total MT",
-    value: (r) => r[5] / 1000,
+    value: (r) => r[7] / 1000,
     full: (v) => num2(v) + " MT",
     brief: (v) => compact(v) + " MT",
     tick: (v) => Math.abs(v) >= 1000 ? compact(v) : f0.format(v),
@@ -2559,7 +3116,7 @@ const TRENDS = {
       { key: "sector", idx: 4, label: "Sector", icon: "ic-tag", all: "All sectors",
         options: () => SECTORS, name: sectorName },
     ],
-    value: (r) => r[6],
+    value: (r) => r[8],
     full: (v) => "S$ " + num2(v),
     brief: (v) => "S$ " + compact(v),
     tick: (v) => Math.abs(v) >= 1000 ? compact(v) : f0.format(v),
@@ -2569,7 +3126,7 @@ const TRENDS = {
      which is why the scale opening downwards and the zero line matter most here. */
   gp: createTrend({
     p: "gp", noun: "Gross profit", axis: "S$", totalCol: "Total gross profit",
-    value: (r) => r[6] - r[7],
+    value: (r) => r[8] - r[9],
     full: (v) => "S$ " + num2(v),
     brief: (v) => "S$ " + compact(v),
     tick: (v) => Math.abs(v) >= 1000 ? compact(v) : f0.format(v),
@@ -2629,17 +3186,28 @@ function render() {
     (state.picked.size ? " · " + state.picked.size + " customer filter" + (state.picked.size > 1 ? "s" : "") : "") +
     (state.sp.size ? " · " + state.sp.size + " salesperson filter" + (state.sp.size > 1 ? "s" : "") : "") +
     (state.grp.size ? " · " + state.grp.size + " product group filter" + (state.grp.size > 1 ? "s" : "") : "") +
+    (state.item.size ? " · " + state.item.size + " item filter" + (state.item.size > 1 ? "s" : "") : "") +
     " · amounts in S$, hover a cell for full precision";
 }
 
 /* ---------- wiring ---------- */
 /* Items whose kilogram conversion is missing in BC. Surfaced rather than absorbed
    silently, because it is the one thing that can make Total MT understate reality. */
-(function renderMtNotes() {
+/* A declaration, not an IIFE: the company selector re-runs it, because a conversion
+   gap belongs to the company whose item carries it and must disappear when the reader
+   switches to the other one. */
+function renderMtNotes() {
   const n = DATA.mtNotes || {};
-  const derived = n.derived || [], weightless = n.weightless || [];
-  if (!derived.length && !weightless.length) return;
+  const inScope = (e) => coCode === CO_GROUP || !e.company || e.company === coCode;
+  const derived = (n.derived || []).filter(inScope);
+  const weightless = (n.weightless || []).filter(inScope);
   const el = $("mt-notes");
+  if (!derived.length && !weightless.length) {
+    el.innerHTML = "";
+    el.hidden = true;
+    syncNotesFooter();
+    return;
+  }
   const parts = [];
   if (derived.length) {
     const kg = derived.reduce((s, e) => s + e.kg, 0);
@@ -2657,14 +3225,76 @@ function render() {
   }
   el.innerHTML = parts.map((p) => "<div>" + p + "</div>").join("");
   el.hidden = false;
-  // The flag sits in a footer of its own now, outside both tabs, since a missing kg
-  // conversion understates tonnage on either. Un-hide that card with it, or an empty
-  // panel is drawn under every tab.
-  $("notes-footer").hidden = false;
-})();
+  syncNotesFooter();
+}
 
-$("co").textContent = DATA.company;
-$("range").textContent = niceDate(DATA.minDate) + " – " + niceDate(DATA.maxDate);
+/* The card sits outside every tab, since both notices apply to all of them. It is drawn
+   only when one of its two children has something to say -- un-hiding the card without
+   checking would put an empty panel under every tab. */
+function syncNotesFooter() {
+  const shown = !$("mt-notes").hidden || !$("group-note").hidden;
+  $("notes-footer").hidden = !shown;
+}
+renderMtNotes();
+
+/* ---------- company selector ---------- */
+/* One control, above the tabs, that re-scopes the whole page: KPI tiles, both product-mix
+   charts, the monthly grid and all three trend tabs. Nothing reloads -- the payload
+   already carries every company, so a switch is a re-filter and a re-render.
+
+   Group is a PLAIN SUM of the companies and is listed last, because it is the aggregate
+   of the entries above it rather than a peer of them. It double-counts the trade between
+   the two companies; the footer note that appears with it says so. */
+function syncFilterVisibility() {
+  // A control that cannot narrow anything invites a click and does nothing.
+  $("spick").closest(".field").hidden = SP_CODES.length < 2;
+  $("gpick").closest(".field").hidden = CO_GROUPS.length < 2;
+}
+
+function syncCompanyChrome() {
+  const range = coRange();
+  $("range").textContent = niceDate(range[0]) + " – " + niceDate(range[1]);
+  // The caveat belongs to Group alone, so it is hidden under a single company rather
+  // than left standing as a note about a view the reader is not looking at.
+  const note = $("group-note");
+  if (note) note.hidden = coCode !== CO_GROUP;
+  syncNotesFooter();
+}
+
+(function buildCompanySelect() {
+  const sel = $("co-select");
+  const opts = CO_LIST.map((c) => [c.code, c.label]);
+  if (CO_LIST.length > 1) opts.push([CO_GROUP, CO_LABEL[CO_GROUP]]);
+  for (const pair of opts) {
+    const o = document.createElement("option");
+    o.value = pair[0];
+    o.textContent = pair[1];
+    sel.appendChild(o);
+  }
+  sel.value = coCode;
+  sel.classList.toggle("group", coCode === CO_GROUP);
+  if (opts.length < 2) sel.closest(".cosel").hidden = true;
+
+  sel.addEventListener("change", () => {
+    coCode = sel.value;
+    sel.classList.toggle("group", coCode === CO_GROUP);
+    applyCompanyScope();
+    syncCompanyChrome();
+    // Same per-company reasoning as the trend tabs: selections are cleared, dates kept.
+    state.picked.clear();
+    state.sp.clear();
+    state.grp.clear();
+    state.item.clear();
+    state.gpOpen.clear();
+    $("search").value = "";
+    $("gpsearch").value = "";
+    syncFilterVisibility();
+    renderMtNotes();
+    for (const t of Object.values(TRENDS)) t.recompany();
+    render();
+  });
+})();
+syncCompanyChrome();
 
 /* Last-refreshed stamp. The absolute time is the build machine's local time, as
    formatted at refresh; the relative age is recomputed from the offset-aware ISO
@@ -2700,7 +3330,7 @@ $("to").addEventListener("change", (e) => { state.to = e.target.value || DATA.ma
 const PANELS = [
   { btn: "pick",  panel: "panel",   onOpen: () => { renderOpts(); $("search").focus(); } },
   { btn: "spick", panel: "sppanel", onOpen: () => renderSpOpts() },
-  { btn: "gpick", panel: "gppanel", onOpen: () => renderGpOpts() },
+  { btn: "gpick", panel: "gppanel", onOpen: () => { renderGpOpts(); $("gpsearch").focus(); } },
   // Every trend tab's dropdowns, so all of them close the same way.
   ...Object.values(TRENDS).flatMap((t) => t.panels),
 ];
@@ -2719,8 +3349,31 @@ for (const p of PANELS) {
     if (open) p.onOpen();
   });
 }
+/* Where the click actually landed, recorded in the CAPTURE phase -- before any option
+   handler has run.
+
+   This matters because every option list rebuilds itself when something in it is ticked:
+   the handler calls render(), render() re-runs the open picker's render*Opts, and that
+   wipes and rebuilds the rows. The element the user clicked is detached by the time the
+   click finishes bubbling to document, so `panel.contains(e.target)` is false and the
+   panel closed itself mid-selection -- worst on the product tree, where ticking a group
+   and then opening it to choose descriptions is two clicks, but present on all three
+   pickers. Capture runs before any of that, so this records the truth. */
+let clickedInPanel = null;
+document.addEventListener("click", (e) => {
+  clickedInPanel = null;
+  for (const p of PANELS) {
+    const el = $(p.panel), btn = $(p.btn);
+    if (el.contains(e.target) || e.target === btn || btn.contains(e.target)) {
+      clickedInPanel = p.panel;
+      break;
+    }
+  }
+}, true);
+
 document.addEventListener("click", (e) => {
   for (const p of PANELS) {
+    if (clickedInPanel === p.panel) continue;   // the click began inside this one
     const el = $(p.panel), btn = $(p.btn);
     if (!el.hidden && !el.contains(e.target) && e.target !== btn && !btn.contains(e.target)) closePanel(p);
   }
@@ -2744,17 +3397,24 @@ $("selall").addEventListener("click", () => {
 $("selnone").addEventListener("click", () => { state.picked.clear(); render(); });
 $("spall").addEventListener("click", () => { for (const c of SP_CODES) state.sp.add(c); render(); });
 $("spnone").addEventListener("click", () => { state.sp.clear(); render(); });
-$("gpall").addEventListener("click", () => { for (const g of DATA.groups) state.grp.add(g); render(); });
-$("gpnone").addEventListener("click", () => { state.grp.clear(); render(); });
+// Select all is every group WHOLE, so any part-selection underneath is dropped with it.
+$("gpall").addEventListener("click", () => {
+  state.item.clear();
+  for (const g of CO_GROUPS) state.grp.add(g);
+  render();
+});
+$("gpnone").addEventListener("click", () => { state.grp.clear(); state.item.clear(); render(); });
+$("gpsearch").addEventListener("input", () => renderGpOpts());
 
 /* A filter that cannot narrow anything is worse than no filter: it invites a click and
    does nothing. Hide the salesperson picker unless there is a choice to make. */
-if (SP_CODES.length < 2) $("spick").closest(".field").hidden = true;
-if (DATA.groups.length < 2) $("gpick").closest(".field").hidden = true;
+syncFilterVisibility();
 
 $("reset").addEventListener("click", () => {
-  state.from = DATA.minDate; state.to = DATA.maxDate;
-  state.picked.clear(); state.sp.clear(); state.grp.clear();
+  state.from = DATA.defaultFrom || DATA.minDate; state.to = DATA.maxDate;
+  state.picked.clear(); state.sp.clear(); state.grp.clear(); state.item.clear();
+  state.gpOpen.clear();
+  $("gpsearch").value = "";
   state.sort = "total:rev"; state.dir = -1;
   $("search").value = "";
   render();
