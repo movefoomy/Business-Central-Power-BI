@@ -349,14 +349,23 @@ and group selection in `st` — deliberately independent of the margin tab's fil
   on the same day.
 - Colour comes from the same `classOf` map as the bars. A group is one colour on both tabs, and
   deselecting one never repaints the others.
-- **Both filter bands are sticky.** `.filters` on the margin tab and `.slicers` on every trend tab carry
-  `position: sticky; top: 0; z-index: 40`, so the controls stay reachable down a long page. They are bounded
-  differently, and deliberately: `.filters` is a direct child of the margin panel and holds for the whole tab,
-  while `.slicers` sits inside its chart tile, so it releases once the chart and its table twin have scrolled
-  past rather than following the reader into the footers. **Keep the band inside the card** — hoisting it out
-  to "fix" that would make it shadow the footers instead. Sticky is broken outright by an `overflow`,
-  `transform`, `filter` or `contain` anywhere up the ancestor chain; nothing on `.wrap`, `.shell`, `.content`,
-  `.card` or the tab panel has one today, so do not add one casually. Both bands opt out below 640px, where
+- **Every tab is three cards: title, filters, figures.** The margin tab always was; the trend tabs used to be
+  one tall tile with the head, the band and the plot stacked flush inside it, which made the two look like
+  different products. `.slicers` is now a card in its own right, exactly as `.filters` is, and `.active`
+  gained a rounded top because it is the first thing in the plot card rather than a strip mid-tile.
+
+- **The Revenue band's Reset sits beside the salesperson picker.** It used to be last in the markup, after a
+  product chip row that takes all twelve columns, which stranded it alone on a row at the foot of the band —
+  a long way from the controls it clears. That middle row is now customer 4 + salesperson 4 + reset 4. Sector
+  is the odd one out: it would make the row sixteen, and it fits today only because Shortcut Dimension 3 is
+  empty in BC so the control hides itself and takes its columns with it. When that dimension is populated the
+  band gains a row.
+
+- **Both filter bands are sticky, and both now hold for their whole tab.** `.filters` and `.slicers` carry
+  `position: sticky; top: 0; z-index: 40`, and since `.slicers` became a card of its own it is bounded by the
+  panel rather than by the chart tile, so the two behave identically. Sticky is broken outright by an
+  `overflow`, `transform`, `filter` or `contain` anywhere up the ancestor chain; nothing on `.wrap`, `.shell`,
+  `.content` or a tab panel has one today, so do not add one casually. Both bands opt out below 640px, where
   they are several rows tall and would eat the viewport, and both need an opaque background.
 
 - **The slicer lives inside the tile.** The dataviz skill calls per-chart filters an anti-pattern, its

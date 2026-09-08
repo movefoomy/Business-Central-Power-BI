@@ -372,12 +372,17 @@ button.twist[aria-expanded="true"] span { transform: rotate(90deg); }
    inside the card rather than being hoisted out of it. The background must stay opaque or
    the plot shows through, and z-index 40 matches the margin band, putting it above the
    plot while leaving the dropdown panels' own z-index scoped inside it. */
+/* A card in its own right, exactly as the margin tab's .filters is, rather than a band
+   flush inside the chart tile. That is what gives the trend tabs the same title / filters
+   / figures rhythm, and it widens the sticky range as a side effect: bounded by the panel
+   rather than by the tile, the band now holds for the whole tab instead of releasing when
+   the chart scrolls past. The background must stay opaque or the plot shows through. */
 .slicers {
   position: sticky; top: 0; z-index: 40;
   display: grid; grid-template-columns: repeat(12, minmax(0, 1fr));
-  gap: 13px 16px; padding: 14px 20px;
-  border-bottom: 1px solid var(--hairline-2); background: var(--surface-2);
-  box-shadow: 0 6px 14px -12px rgba(0, 0, 0, .5);
+  gap: 13px 16px; padding: 14px 18px; margin-bottom: 22px;
+  background: var(--surface); border: 1px solid var(--hairline);
+  border-radius: 10px; box-shadow: var(--shadow);
 }
 .slicers .field { min-width: 0; gap: 0; }
 .slicers .field > label {
@@ -407,10 +412,16 @@ button.twist[aria-expanded="true"] span { transform: rotate(90deg); }
 .f-reset { grid-column: span 2; }
 
 /* The Revenue band carries two dimensions the others do not, so it runs to three rows:
-   date 3 + quick 4 + grain 3 + view 2, then customer 3 + salesperson 3 + sector 3 +
-   reset 3, then product group across all twelve. Keep each row summing to 12. */
-#panel-rev .f-cust, .f-sp, .f-sector { grid-column: span 3; }
-#panel-rev .f-reset { grid-column: span 3; }
+   date 3 + quick 4 + grain 3 + view 2, then customer 4 + salesperson 4 + reset 4, then
+   the product chips across all twelve. Reset sits beside the salesperson picker rather
+   than after the chip row, which had stranded it alone on a row at the foot of the band.
+   Sector is the odd one out: it is the fourth control on that middle row and would make
+   it sixteen, and it fits today only because Shortcut Dimension 3 is empty in BC so the
+   control hides itself and takes its columns with it. The day the dimension is populated
+   this band gains a row; that is intended, not a bug to pad around. Keep each row
+   summing to 12. */
+#panel-rev .f-cust, #panel-rev .f-sp, #panel-rev .f-reset { grid-column: span 4; }
+#panel-rev .f-sector { grid-column: span 4; }
 #panel-rev .f-groups { grid-column: span 12; }
 
 @media (max-width: 1080px) {
@@ -439,6 +450,7 @@ button.twist[aria-expanded="true"] span { transform: rotate(90deg); }
   display: flex; flex-wrap: wrap; align-items: center; gap: 7px 9px;
   padding: 10px 20px; border-bottom: 1px solid var(--hairline-2); font-size: 12px;
   background: color-mix(in srgb, var(--accent) 3%, var(--surface));
+  border-radius: 10px 10px 0 0;
 }
 .active .lead {
   display: inline-flex; align-items: center; gap: 6px;
@@ -938,12 +950,13 @@ footer .flag[role="note"] i { color: var(--ink); font-style: normal; font-weight
   </div><!-- /panel-margin -->
 
   <div id="panel-trend" role="tabpanel" aria-labelledby="tab-trend" hidden>
-    <section class="card">
+    <section class="card page-card">
       <div class="card-head">
         <p class="eyebrow">Trend</p>
         <h2>MT trend</h2>
         <p class="hint" id="tr-hint"></p>
       </div>
+    </section>
 
       <!-- The slicer band scopes this whole tab, which holds exactly one chart and its
            table twin. That keeps it a filter row above everything it scopes rather than a
@@ -1009,6 +1022,7 @@ footer .flag[role="note"] i { color: var(--ink); font-style: normal; font-weight
         </div>
       </div>
 
+    <section class="card">
       <div class="active" id="tr-active" aria-live="polite"></div>
 
       <div class="chart-body" id="tr-chartview">
@@ -1097,12 +1111,13 @@ footer .flag[role="note"] i { color: var(--ink); font-style: normal; font-weight
   </div><!-- /panel-trend -->
 
   <div id="panel-rev" role="tabpanel" aria-labelledby="tab-rev" hidden>
-    <section class="card">
+    <section class="card page-card">
       <div class="card-head">
         <p class="eyebrow">Trend</p>
         <h2>Revenue trend</h2>
         <p class="hint" id="rv-hint"></p>
       </div>
+    </section>
 
       <!-- The slicer band scopes this whole tab, which holds exactly one chart and its
            table twin. That keeps it a filter row above everything it scopes rather than a
@@ -1191,19 +1206,20 @@ footer .flag[role="note"] i { color: var(--ink); font-style: normal; font-weight
           </div>
         </div>
 
-        <div class="field f-groups">
-          <label id="rv-gl"><svg class="ic"><use href="#ic-grid"/></svg>Product group</label>
-          <div class="ctl presets fill" role="group" aria-labelledby="rv-gl" id="rv-groups"></div>
-        </div>
-
         <div class="field f-reset">
           <label><svg class="ic"><use href="#ic-reset"/></svg>Clear</label>
           <div class="ctl">
             <button type="button" class="chip reset-chip" id="rv-reset">Reset filters</button>
           </div>
         </div>
+
+        <div class="field f-groups">
+          <label id="rv-gl"><svg class="ic"><use href="#ic-grid"/></svg>Product group</label>
+          <div class="ctl presets fill" role="group" aria-labelledby="rv-gl" id="rv-groups"></div>
+        </div>
       </div>
 
+    <section class="card">
       <div class="active" id="rv-active" aria-live="polite"></div>
 
       <div class="chart-body" id="rv-chartview">
@@ -1292,12 +1308,13 @@ footer .flag[role="note"] i { color: var(--ink); font-style: normal; font-weight
   </div><!-- /panel-rev -->
 
   <div id="panel-gp" role="tabpanel" aria-labelledby="tab-gp" hidden>
-    <section class="card">
+    <section class="card page-card">
       <div class="card-head">
         <p class="eyebrow">Trend</p>
         <h2>Gross profit trend</h2>
         <p class="hint" id="gp-hint"></p>
       </div>
+    </section>
 
       <!-- The slicer band scopes this whole tab, which holds exactly one chart and its
            table twin. That keeps it a filter row above everything it scopes rather than a
@@ -1363,6 +1380,7 @@ footer .flag[role="note"] i { color: var(--ink); font-style: normal; font-weight
         </div>
       </div>
 
+    <section class="card">
       <div class="active" id="gp-active" aria-live="polite"></div>
 
       <div class="chart-body" id="gp-chartview">
