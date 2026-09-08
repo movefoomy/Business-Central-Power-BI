@@ -185,11 +185,20 @@ select.co-select.group { border-color: var(--accent); color: var(--accent); }
 .stamp .ago { font-weight: 400; color: var(--ink-3); }
 .stamp .postings { font-size: 11.5px; color: var(--ink-3); margin-top: 2px; }
 .stamp .postings b { color: var(--ink-2); font-weight: 600; }
-.refresher { margin-top: 12px; width: 100%; }
+/* The title card is a row: what this tab is on the left, what you can do to it on the
+   right. The title needs a wrapper of its own or the eyebrow, heading and hint each
+   become a flex item and line up side by side. */
+.page-card .card-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 12px 20px; flex-wrap: wrap;
+}
+.ph-text { min-width: 0; }
+.ph-actions { margin-left: auto; text-align: right; max-width: 260px; }
+.refresher { display: inline-block; }
 .refresh-btn {
   font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-  width: 100%; padding: 8px 12px;
+  padding: 8px 14px;
   color: var(--accent); background: var(--accent-soft);
   border: 1px solid transparent; border-radius: 7px;
 }
@@ -203,7 +212,7 @@ select.co-select.group { border-color: var(--accent); color: var(--accent); }
 @media (prefers-reduced-motion: reduce) { .refresh-btn.busy .ic { animation: none; } }
 .refresh-note {
   margin: 7px 0 0; font-size: 11px; line-height: 1.45; color: var(--ink-3);
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums; text-align: right;
 }
 .refresh-note.bad { color: var(--neg); }
 .refresh-note.good { color: var(--pos); }
@@ -794,17 +803,6 @@ footer .flag[role="note"] i { color: var(--ink); font-style: normal; font-weight
       <div class="lbl"><span class="dot" aria-hidden="true"></span>Last refreshed</div>
       <div class="val"><span id="gen">&mdash;</span><span class="ago" id="ago"></span></div>
       <div class="postings">Postings <b id="range"></b></div>
-
-      <!-- Hidden unless the page is being served by serve.py on this machine, which is
-           the only thing that can reach Business Central. On the published site there is
-           nothing behind it, so it never appears there. -->
-      <div class="refresher" id="refresher" hidden>
-        <button type="button" class="refresh-btn" id="refresh-btn">
-          <svg class="ic" aria-hidden="true"><use href="#ic-reset"/></svg>
-          <span id="refresh-label">Refresh data</span>
-        </button>
-        <p class="refresh-note" id="refresh-note" hidden></p>
-      </div>
     </div>
   </aside>
 
@@ -814,9 +812,12 @@ footer .flag[role="note"] i { color: var(--ink); font-style: normal; font-weight
 
   <section class="card page-card">
     <div class="card-head">
-      <p class="eyebrow">Margin</p>
-      <h2>Sales margin</h2>
-      <p class="hint">Volume, revenue, cost of sales and gross profit by customer, month by month.</p>
+      <div class="ph-text">
+        <p class="eyebrow">Margin</p>
+        <h2>Sales margin</h2>
+        <p class="hint">Volume, revenue, cost of sales and gross profit by customer, month by month.</p>
+      </div>
+      <div class="ph-actions" data-refresh-slot></div>
     </div>
   </section>
 
@@ -987,9 +988,12 @@ footer .flag[role="note"] i { color: var(--ink); font-style: normal; font-weight
   <div id="panel-trend" role="tabpanel" aria-labelledby="tab-trend" hidden>
     <section class="card page-card">
       <div class="card-head">
-        <p class="eyebrow">Trend</p>
-        <h2>MT trend</h2>
-        <p class="hint" id="tr-hint"></p>
+        <div class="ph-text">
+          <p class="eyebrow">Trend</p>
+          <h2>MT trend</h2>
+          <p class="hint" id="tr-hint"></p>
+        </div>
+        <div class="ph-actions" data-refresh-slot></div>
       </div>
     </section>
 
@@ -1148,9 +1152,12 @@ footer .flag[role="note"] i { color: var(--ink); font-style: normal; font-weight
   <div id="panel-rev" role="tabpanel" aria-labelledby="tab-rev" hidden>
     <section class="card page-card">
       <div class="card-head">
-        <p class="eyebrow">Trend</p>
-        <h2>Revenue trend</h2>
-        <p class="hint" id="rv-hint"></p>
+        <div class="ph-text">
+          <p class="eyebrow">Trend</p>
+          <h2>Revenue trend</h2>
+          <p class="hint" id="rv-hint"></p>
+        </div>
+        <div class="ph-actions" data-refresh-slot></div>
       </div>
     </section>
 
@@ -1345,9 +1352,12 @@ footer .flag[role="note"] i { color: var(--ink); font-style: normal; font-weight
   <div id="panel-gp" role="tabpanel" aria-labelledby="tab-gp" hidden>
     <section class="card page-card">
       <div class="card-head">
-        <p class="eyebrow">Trend</p>
-        <h2>Gross profit trend</h2>
-        <p class="hint" id="gp-hint"></p>
+        <div class="ph-text">
+          <p class="eyebrow">Trend</p>
+          <h2>Gross profit trend</h2>
+          <p class="hint" id="gp-hint"></p>
+        </div>
+        <div class="ph-actions" data-refresh-slot></div>
       </div>
     </section>
 
@@ -3341,27 +3351,56 @@ setInterval(renderStamp, 30000);
 
 /* ---------- the Refresh button ---------- */
 /* The page cannot fetch from Business Central: it is on-prem behind a self-signed
-   certificate, sends no CORS headers, and its credentials must never reach a browser.
-   So the button asks serve.py -- running on the machine that CAN reach BC -- to run the
-   same pipeline the hourly task used to run, and reloads when it finishes.
+   certificate, sends no CORS headers, and its credentials must never reach a browser. So
+   the button asks serve.py -- running on the machine that CAN reach BC -- to run the same
+   pipeline the hourly task used to run, and reloads when it finishes. A clean run also
+   commits and pushes, which is how the published site gets the new figures; nothing on
+   Vercel refreshes anything by itself.
 
-   Everything here is conditional on that server answering. Opened from disk or from the
-   published site the probe fails, the control stays hidden, and the page is exactly what
-   it was before. */
+   One control per tab, at the top of each title card, because that is where a reader
+   looking at stale figures is looking. They are built from one string and driven by one
+   controller, so four buttons cannot drift apart -- and all four are hidden unless the
+   probe below finds a server. Opened from disk, from the published site or from the
+   artifact, that probe fails and the page is exactly what it was. */
 (function refreshButton() {
-  const wrap = $("refresher"), btn = $("refresh-btn");
-  const label = $("refresh-label"), note = $("refresh-note");
-  if (!wrap || !btn) return;
+  const slots = [...document.querySelectorAll("[data-refresh-slot]")];
+  if (!slots.length) return;
 
-  const say = (text, kind) => {
-    note.textContent = text || "";
-    note.hidden = !text;
-    note.classList.toggle("bad", kind === "bad");
-    note.classList.toggle("good", kind === "good");
-  };
+  const controls = slots.map((slot) => {
+    const wrap = document.createElement("div");
+    wrap.className = "refresher";
+    wrap.hidden = true;
+    wrap.innerHTML =
+      '<button type="button" class="refresh-btn">' +
+        '<svg class="ic" aria-hidden="true"><use href="#ic-reset"/></svg>' +
+        '<span class="refresh-label">Refresh data</span>' +
+      '</button>' +
+      '<p class="refresh-note" hidden></p>';
+    slot.appendChild(wrap);
+    return {
+      wrap: wrap,
+      btn: wrap.querySelector(".refresh-btn"),
+      label: wrap.querySelector(".refresh-label"),
+      note: wrap.querySelector(".refresh-note"),
+    };
+  });
+
+  const show = () => controls.forEach((c) => { c.wrap.hidden = false; });
+  const say = (text, kind) => controls.forEach((c) => {
+    c.note.textContent = text || "";
+    c.note.hidden = !text;
+    c.note.classList.toggle("bad", kind === "bad");
+    c.note.classList.toggle("good", kind === "good");
+  });
+  const busy = (on) => controls.forEach((c) => {
+    c.btn.disabled = on;
+    c.btn.classList.toggle("busy", on);
+    c.label.textContent = on ? "Refreshing\u2026" : "Refresh data";
+  });
+
   const mins = (secs) => {
-    const m = Math.floor(secs / 60), s = Math.round(secs % 60);
-    return m ? m + "m " + String(s).padStart(2, "0") + "s" : s + "s";
+    const m = Math.floor(secs / 60), sec = Math.round(secs % 60);
+    return m ? m + "m " + String(sec).padStart(2, "0") + "s" : sec + "s";
   };
   // The last line worth showing: refresh.py's own progress counters are noisy.
   const headline = (tail) => {
@@ -3373,12 +3412,6 @@ setInterval(renderStamp, 30000);
   };
 
   let polling = null;
-
-  function busy(on) {
-    btn.disabled = on;
-    btn.classList.toggle("busy", on);
-    label.textContent = on ? "Refreshing\u2026" : "Refresh data";
-  }
 
   function poll() {
     fetch("/api/status", { cache: "no-store" })
@@ -3395,8 +3428,8 @@ setInterval(renderStamp, 30000);
         busy(false);
         if (st.exitCode === 0) {
           say("Done. Reloading\u2026", "good");
-          // The payload is embedded at build time, so the new figures arrive with the
-          // new page rather than through this fetch.
+          // The payload is embedded at build time, so the new figures arrive with the new
+          // page rather than through this fetch.
           setTimeout(() => location.reload(), 600);
         } else if (st.exitCode !== null && st.exitCode !== undefined) {
           say("Refresh failed (exit " + st.exitCode + "). " + headline(st.tail || []) +
@@ -3417,24 +3450,26 @@ setInterval(renderStamp, 30000);
     poll();
   }
 
-  btn.addEventListener("click", () => {
+  function start() {
     busy(true);
     say("Starting\u2026");
     fetch("/api/refresh", { method: "POST", cache: "no-store" })
+      // 409 means one is already running, which is a state to join, not an error.
       .then((r) => { if (!r.ok && r.status !== 409) throw new Error("HTTP " + r.status); })
       .then(watch)
       .catch((e) => { busy(false); say("Could not start the refresh: " + e.message, "bad"); });
-  });
+  }
+  controls.forEach((c) => c.btn.addEventListener("click", start));
 
-  // Probe once. Only a server that answers this turns the control on -- and if a refresh
-  // is already in flight (someone reloaded mid-run), pick it up rather than start another.
+  // Probe once. Only a server that answers this turns the controls on -- and if a refresh
+  // is already in flight (someone reloaded mid-run), join it rather than start another.
   fetch("/api/status", { cache: "no-store" })
     .then((r) => (r.ok ? r.json() : Promise.reject()))
     .then((st) => {
-      wrap.hidden = false;
+      show();
       if (st.running) { busy(true); watch(); }
     })
-    .catch(() => { /* no server behind this page: leave the button hidden */ });
+    .catch(() => { /* no server behind this page: leave the controls hidden */ });
 })();
 for (const el of [$("from"), $("to")]) { el.min = DATA.minDate; el.max = DATA.maxDate; }
 

@@ -39,11 +39,19 @@ only, serves a three-file allow-list (`dashboard.html`, `data.json`, `refresh.lo
 **`run_refresh.ps1`**, the same wrapper the task used, rather than a second copy of the publish path.
 Standard library only, like everything else here.
 
-**The button is conditional on that server answering.** It probes `/api/status` on load and stays hidden
-when nothing replies, so the published site and the artifact — where the fetch fails or is blocked
-outright by CSP — are exactly as they were. A refresh is minutes, not seconds, so the button polls
-`/api/status`, shows elapsed time and the last meaningful log line, and reloads only on exit 0. Reloading
-mid-run reattaches to the running job instead of starting a second one.
+**One button per tab, at the top of each title card**, in the `data-refresh-slot` each `.page-card`
+carries — that is where a reader looking at stale figures is already looking. All four are built from one
+string and driven by one controller, so they cannot drift apart: pressing any of them puts all four into
+the same state. `.page-card .card-head` is a flex row for this, which is why the title sits in a `.ph-text`
+wrapper — without one the eyebrow, heading and hint would each become a flex item and line up side by side.
+
+**The buttons are conditional on that server answering.** The controller probes `/api/status` on load and
+leaves them hidden when nothing replies, so the published site and the artifact — where the fetch 404s or
+is blocked outright by CSP — are exactly as they were. **Refreshing is local-only by design**: Vercel
+cannot reach BC, a 25-minute fetch would not fit a serverless function anyway, and the site gets new
+figures the only way it can, from the push a clean run makes. A refresh is minutes, not seconds, so the
+controller polls `/api/status`, shows elapsed time and the last meaningful log line, and reloads only on
+exit 0. Reloading mid-run reattaches to the running job instead of starting a second one.
 
 **Publishing still happens on a clean run**, because `run_refresh.ps1` is unchanged: it commits
 `dashboard.html` and pushes to `dashboard/main`, and Vercel rebuilds
