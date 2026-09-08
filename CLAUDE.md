@@ -21,21 +21,41 @@ python refresh.py                  # fetch -> filter -> aggregate -> rebuild dat
 CHECK_TOTALS=0 python refresh.py   # skip the sanity and drift checks
 ```
 
-A Windows scheduled task, **BC Sales Margin Refresh**, runs `run_refresh.ps1` hourly (interactive logon,
-no stored password) and appends to `refresh.log`. Inspect with `Get-ScheduledTaskInfo -TaskName
-'BC Sales Margin Refresh'` — `LastTaskResult` 0 is success.
+**Refreshing is manual.** The hourly Windows task, *BC Sales Margin Refresh*, was **removed** on
+8 Sep 2026 by request; its exported definition sits beside the code as
+`BC-Sales-Margin-Refresh.task.xml` (gitignored — it carries an account SID) if it is ever wanted back.
+Two ways to rebuild now:
 
-**The task also publishes.** On a clean run it commits `dashboard.html` and pushes to
-`dashboard/main` (`github.com/movefoomy/Business-Central-Power-BI`, private), and Vercel rebuilds
-<https://business-central-power-bi.vercel.app/> from that push. This is the only shape that works:
-Business Central is on-prem behind a self-signed cert, so no cloud cron can reach it — this machine
-fetches, and pushing is how the result leaves it. It pushes **only when `refresh.py` exits 0**, so a
-build the sanity gate rejected never reaches the site, and a push failure is logged without failing
-the task — the commit stays local and the next hour retries. `GIT_TERMINAL_PROMPT=0` and
-`GCM_INTERACTIVE=never` are set so an expired credential fails fast instead of hanging the task
-forever on an invisible prompt. It pushes every hour even when the figures have not moved, because
-the page's own refresh stamp goes amber past 90 minutes: skipping unchanged data would make a healthy
-site look stalled.
+```bash
+python refresh.py                  # fetch -> filter -> aggregate -> rebuild data.json + dashboard.html
+refresh-dashboard.cmd              # serve the page locally, with its Refresh button working
+```
+
+**`serve.py` is what makes the button possible, and it has to exist.** The page cannot fetch from BC
+itself — on-prem, self-signed certificate, no CORS headers, and Basic-auth credentials that must never
+reach a browser. So the button asks a server on *this* machine to do it. `serve.py` binds `127.0.0.1`
+only, serves a three-file allow-list (`dashboard.html`, `data.json`, `refresh.log` — **never**
+`config.json`), rejects a non-loopback `Host` so DNS rebinding cannot reach `/api/refresh`, and runs
+**`run_refresh.ps1`**, the same wrapper the task used, rather than a second copy of the publish path.
+Standard library only, like everything else here.
+
+**The button is conditional on that server answering.** It probes `/api/status` on load and stays hidden
+when nothing replies, so the published site and the artifact — where the fetch fails or is blocked
+outright by CSP — are exactly as they were. A refresh is minutes, not seconds, so the button polls
+`/api/status`, shows elapsed time and the last meaningful log line, and reloads only on exit 0. Reloading
+mid-run reattaches to the running job instead of starting a second one.
+
+**Publishing still happens on a clean run**, because `run_refresh.ps1` is unchanged: it commits
+`dashboard.html` and pushes to `dashboard/main`, and Vercel rebuilds
+<https://business-central-power-bi.vercel.app/> from that push. It pushes **only when `refresh.py` exits
+0**, so a build the sanity gate rejected never reaches the site, and a push failure is logged without
+failing the run. Business Central is on-prem behind a self-signed cert, so no cloud cron can reach it —
+this machine fetches, and pushing is how the result leaves it.
+
+**The refresh stamp's amber threshold is 12 hours, not 90 minutes.** Ninety made sense while a task ran
+hourly and a stopped one looked identical to a healthy one. With refreshing deliberate it would nag from
+mid-morning; half a day is the point at which figures are old enough to mislead someone who left the tab
+open overnight.
 
 The **claude.ai artifact is a separate publication** and does not follow: it embeds its data at build
 time and must still be republished by Claude.

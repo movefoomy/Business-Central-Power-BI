@@ -172,7 +172,7 @@ group never repaints the rest. Hovering the plot gives a crosshair and every gro
 nearest period.
 
 **A last-refreshed stamp** (top right) shows the build time and a live relative age that re-ticks on
-its own. Past 90 minutes it turns amber — the task runs hourly, so a stopped refresh would otherwise
+its own. Past 12 hours it turns amber — refreshing is manual, so stale figures would otherwise
 look identical to a healthy one. Underneath it, the posting date range actually present in the data.
 
 **A footer on each tab** explaining that tab's own figures in business terms. Sales margin covers its six
@@ -182,7 +182,7 @@ from the last run appear in a separate panel below both (see *Missing conversion
 
 ## Refreshing
 
-A Windows scheduled task, **BC Sales Margin Refresh**, runs every hour and keeps `dashboard.html` on
+Refreshing is manual. The hourly task was removed on 8 Sep 2026; `refresh-dashboard.cmd` serves the page with its **Refresh data** button working, and that button keeps `dashboard.html` on
 disk current. It runs as you, only while you are logged on, with no stored password, and appends each
 run to `refresh.log`. Nothing needs to be open for it to work.
 
@@ -190,13 +190,13 @@ To run it by hand, or to check on it:
 
 ```powershell
 python refresh.py                                    # refresh now, output to the console
-Start-ScheduledTask  -TaskName 'BC Sales Margin Refresh'   # trigger the hourly job now
-Get-ScheduledTaskInfo -TaskName 'BC Sales Margin Refresh'  # LastRunTime / LastTaskResult (0 = success)
+refresh-dashboard.cmd                                      # serve the page; use its Refresh button
+python refresh.py                                          # or rebuild straight from the command line
 Get-Content refresh.log -Tail 20                     # what the last run did
-Unregister-ScheduledTask -TaskName 'BC Sales Margin Refresh'   # stop the hourly refresh
+Register-ScheduledTask -Xml (Get-Content BC-Sales-Margin-Refresh.task.xml -Raw) -TaskName 'BC Sales Margin Refresh'   # put the hourly schedule back
 ```
 
-**The published artifact does not update itself.** Its data is embedded at build time, so the hourly
+**The published artifact does not update itself.** Its data is embedded at build time, so the
 task refreshes the local file only. To move a refresh onto the claude.ai link, ask Claude to republish
 `dashboard.html` to the same artifact URL.
 
@@ -238,7 +238,9 @@ One environment variable: **`CHECK_TOTALS=0`** skips the sanity gate and the dri
 | `CHANGELOG.md` | What changed, by date and commit. |
 | `config.json` | Endpoint and credentials. **Not committed** (see `.gitignore`). |
 | `refresh.py` | Fetch, filter, aggregate, and inject data into the template. |
-| `run_refresh.ps1` | What the hourly task runs: calls `refresh.py`, timestamps the output into `refresh.log`, trims the log to 1,000 lines. |
+| `run_refresh.ps1` | What the Refresh button runs: calls `refresh.py`, timestamps the output into `refresh.log`, trims the log to 1,000 lines, and publishes on a clean run. |
+| `serve.py` | Serves the dashboard on `127.0.0.1:8787` and exposes `/api/refresh`, which is what the page's Refresh button calls. Loopback only; never serves `config.json`. |
+| `refresh-dashboard.cmd` | Double-click launcher: starts `serve.py` and opens the dashboard. |
 | `refresh.log` | Generated. Run history and errors. Not committed. |
 | `dashboard.template.html` | The dashboard. Edit this, never `dashboard.html`. |
 | `dashboard.html` | Generated. Overwritten on every refresh. |
@@ -339,7 +341,7 @@ does. It is a warning, not a failure, because a genuine large backposting is pos
 Set `CHECK_TOTALS=0` to skip both.
 
 An earlier version compared against a frozen set of expected totals. That was the right tool for a
-one-off build and the wrong one for an hourly job — it began warning on every single run the moment BC
+one-off build and the wrong one for a repeated job — it began warning on every single run the moment BC
 posted new data, which is exactly the noise that trains you to ignore a log. Assert invariants, not
 remembered numbers.
 

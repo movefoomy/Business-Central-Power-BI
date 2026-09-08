@@ -185,7 +185,31 @@ select.co-select.group { border-color: var(--accent); color: var(--accent); }
 .stamp .ago { font-weight: 400; color: var(--ink-3); }
 .stamp .postings { font-size: 11.5px; color: var(--ink-3); margin-top: 2px; }
 .stamp .postings b { color: var(--ink-2); font-weight: 600; }
-/* The scheduled task runs hourly, so anything much older means it has stopped. */
+.refresher { margin-top: 12px; width: 100%; }
+.refresh-btn {
+  font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  width: 100%; padding: 8px 12px;
+  color: var(--accent); background: var(--accent-soft);
+  border: 1px solid transparent; border-radius: 7px;
+}
+.refresh-btn:hover { border-color: var(--accent); }
+.refresh-btn[disabled] { cursor: progress; opacity: .75; }
+.refresh-btn .ic { width: 13px; height: 13px; flex: none; }
+/* Spun only while a refresh is in flight, and never for readers who have asked for less
+   motion -- the global reduced-motion rule kills transitions, not animations. */
+.refresh-btn.busy .ic { animation: spin 1.1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .refresh-btn.busy .ic { animation: none; } }
+.refresh-note {
+  margin: 7px 0 0; font-size: 11px; line-height: 1.45; color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.refresh-note.bad { color: var(--neg); }
+.refresh-note.good { color: var(--pos); }
+
+/* A refresh is manual now, so age is information rather than an alarm -- but a page left
+   open for a working day is still worth flagging. */
 .stamp.stale .dot { background: var(--warn); }
 .stamp.stale .ago { color: var(--warn); font-weight: 600; }
 
@@ -770,6 +794,17 @@ footer .flag[role="note"] i { color: var(--ink); font-style: normal; font-weight
       <div class="lbl"><span class="dot" aria-hidden="true"></span>Last refreshed</div>
       <div class="val"><span id="gen">&mdash;</span><span class="ago" id="ago"></span></div>
       <div class="postings">Postings <b id="range"></b></div>
+
+      <!-- Hidden unless the page is being served by serve.py on this machine, which is
+           the only thing that can reach Business Central. On the published site there is
+           nothing behind it, so it never appears there. -->
+      <div class="refresher" id="refresher" hidden>
+        <button type="button" class="refresh-btn" id="refresh-btn">
+          <svg class="ic" aria-hidden="true"><use href="#ic-reset"/></svg>
+          <span id="refresh-label">Refresh data</span>
+        </button>
+        <p class="refresh-note" id="refresh-note" hidden></p>
+      </div>
     </div>
   </aside>
 
@@ -3279,7 +3314,11 @@ syncCompanyChrome();
 /* Last-refreshed stamp. The absolute time is the build machine's local time, as
    formatted at refresh; the relative age is recomputed from the offset-aware ISO
    stamp so it stays correct for a viewer in any timezone. */
-const STALE_AFTER_MIN = 90;  // the task runs hourly, so 90 min means it has stopped
+/* Refreshing is a deliberate act now that the hourly task is gone, so age is information
+   rather than an alarm -- ninety minutes would have nagged from mid-morning onwards. Half
+   a day is the point at which figures are old enough to mislead someone who has left the
+   tab open since yesterday. */
+const STALE_AFTER_MIN = 720;
 function renderStamp() {
   $("gen").textContent = DATA.generated || "—";
   const el = $("ago"), stamp = $("stamp");
@@ -3294,11 +3333,109 @@ function renderStamp() {
   const stale = mins > STALE_AFTER_MIN;
   stamp.classList.toggle("stale", stale);
   stamp.title = stale
-    ? "This data is " + ago + ". The hourly refresh may have stopped — check the BC Sales Margin Refresh scheduled task."
-    : "Refreshes hourly from Business Central.";
+    ? "This data is " + ago + ". Use Refresh data to rebuild it from Business Central."
+    : "Refreshed from Business Central on demand.";
 }
 renderStamp();
 setInterval(renderStamp, 30000);
+
+/* ---------- the Refresh button ---------- */
+/* The page cannot fetch from Business Central: it is on-prem behind a self-signed
+   certificate, sends no CORS headers, and its credentials must never reach a browser.
+   So the button asks serve.py -- running on the machine that CAN reach BC -- to run the
+   same pipeline the hourly task used to run, and reloads when it finishes.
+
+   Everything here is conditional on that server answering. Opened from disk or from the
+   published site the probe fails, the control stays hidden, and the page is exactly what
+   it was before. */
+(function refreshButton() {
+  const wrap = $("refresher"), btn = $("refresh-btn");
+  const label = $("refresh-label"), note = $("refresh-note");
+  if (!wrap || !btn) return;
+
+  const say = (text, kind) => {
+    note.textContent = text || "";
+    note.hidden = !text;
+    note.classList.toggle("bad", kind === "bad");
+    note.classList.toggle("good", kind === "good");
+  };
+  const mins = (secs) => {
+    const m = Math.floor(secs / 60), s = Math.round(secs % 60);
+    return m ? m + "m " + String(s).padStart(2, "0") + "s" : s + "s";
+  };
+  // The last line worth showing: refresh.py's own progress counters are noisy.
+  const headline = (tail) => {
+    for (let i = tail.length - 1; i >= 0; i--) {
+      const t = tail[i].trim();
+      if (t && !/^(value entries|customers|items|salespeople)\b/.test(t)) return t;
+    }
+    return tail.length ? tail[tail.length - 1].trim() : "";
+  };
+
+  let polling = null;
+
+  function busy(on) {
+    btn.disabled = on;
+    btn.classList.toggle("busy", on);
+    label.textContent = on ? "Refreshing\u2026" : "Refresh data";
+  }
+
+  function poll() {
+    fetch("/api/status", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((st) => {
+        if (st.running) {
+          busy(true);
+          // A full two-company fetch is minutes, not seconds, so show it working.
+          say("Running for " + mins(st.elapsed || 0) + ". " + headline(st.tail || []));
+          return;
+        }
+        clearInterval(polling);
+        polling = null;
+        busy(false);
+        if (st.exitCode === 0) {
+          say("Done. Reloading\u2026", "good");
+          // The payload is embedded at build time, so the new figures arrive with the
+          // new page rather than through this fetch.
+          setTimeout(() => location.reload(), 600);
+        } else if (st.exitCode !== null && st.exitCode !== undefined) {
+          say("Refresh failed (exit " + st.exitCode + "). " + headline(st.tail || []) +
+              " The dashboard still shows the last good data.", "bad");
+        }
+      })
+      .catch(() => {
+        clearInterval(polling);
+        polling = null;
+        busy(false);
+        say("Lost contact with the refresh server. Is its window still open?", "bad");
+      });
+  }
+
+  function watch() {
+    if (polling) return;
+    polling = setInterval(poll, 3000);
+    poll();
+  }
+
+  btn.addEventListener("click", () => {
+    busy(true);
+    say("Starting\u2026");
+    fetch("/api/refresh", { method: "POST", cache: "no-store" })
+      .then((r) => { if (!r.ok && r.status !== 409) throw new Error("HTTP " + r.status); })
+      .then(watch)
+      .catch((e) => { busy(false); say("Could not start the refresh: " + e.message, "bad"); });
+  });
+
+  // Probe once. Only a server that answers this turns the control on -- and if a refresh
+  // is already in flight (someone reloaded mid-run), pick it up rather than start another.
+  fetch("/api/status", { cache: "no-store" })
+    .then((r) => (r.ok ? r.json() : Promise.reject()))
+    .then((st) => {
+      wrap.hidden = false;
+      if (st.running) { busy(true); watch(); }
+    })
+    .catch(() => { /* no server behind this page: leave the button hidden */ });
+})();
 for (const el of [$("from"), $("to")]) { el.min = DATA.minDate; el.max = DATA.maxDate; }
 
 $("from").addEventListener("change", (e) => { state.from = e.target.value || DATA.minDate; render(); });

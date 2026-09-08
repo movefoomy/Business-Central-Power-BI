@@ -4,6 +4,8 @@ data.json
 refresh.log
 refresh.py
 run_refresh.ps1
+serve.py
+refresh-dashboard.cmd
 dashboard.template.html
 CLAUDE.md
 CHANGELOG.md
