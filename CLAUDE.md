@@ -231,29 +231,23 @@ and a click inside any of them is never mistaken for a click outside. Add a four
 `PANELS` and a `render*Opts`, not by copying the wiring. Customer and salesperson also share `fillOpts`;
 **the product picker does not**, because it is a tree rather than a list — see below.
 
-**The product filter is two levels: product group, then item description, on ALL FOUR TABS.** A group is too
-coarse a question on its own — `NAOH` covers 22 item descriptions under CIM and 37 under CIL, at different
-strengths and prices, so "which spec is losing money" cannot be asked of the group. `renderProductTree()` is
-the single renderer; it owns no state, taking the two Sets to read and mutate, the totals to show, a formatter
-and an `onChange`. **A fifth product picker is another call to it, never a copy.** The trend tabs replaced
-their group chip row with it, for the same reason the customer filter was never chips: a chip cannot carry a
-second level, and 175 descriptions is far past what a chip row holds. Each trend tab shows the figure beside
-each entry in **its own measure** — tonnage on the MT tab, gross profit on the GP tab — via `productTotalsT()`,
-not revenue.
+**The product filter is two levels: product group, then item description — on the MARGIN TAB ONLY.** The trend
+tabs filter by group alone, through a chip row and their own `st.groups`. A group is too coarse a question on
+the margin tab: `NAOH` covers 22 item descriptions under CIM and 37 under CIL, at different strengths and
+prices, so "which spec is losing money" cannot be asked of the group.
 
-- **The selection is two sets, not one.** The margin tab's are `state.grp`/`state.item`; each trend tab has its
-  own `st.groups`/`st.item`, so the tabs stay independent while the meaning of a tick does not.
-  `productPasses(grpSet, itemSet, grp, item)` is the single predicate: both empty means no filter, otherwise
-  the row passes if **either** its group or its item is ticked. That OR is what makes a parent tick mean "all
-  of these" and a child tick mean "just this one". Every filtering loop goes through it — never test a group
-  Set directly again.
-- **Both empty means everything, and so does every group ticked whole.** `productIsAll()` treats the two
-  alike, so Select all does not light a pill that narrows nothing. The trend tabs' `st.groups` used to start
-  as every group explicitly; it now starts empty, which is what let them share the predicate at all — the old
-  shape could not express "all of NAOH plus one spec of HCL".
-- **`selectedGroups()` decides which lines a trend tab draws**, in fixed palette order: a group is on screen
-  if it is ticked whole or any of its items is. Colour still follows the group, so narrowing to one spec never
-  repaints its neighbours — asserted.
+Extending the tree to the three trend tabs was built and then **rolled back by request** (8 Sep 2026), along
+with the shared `renderProductTree()` it was refactored into. If it is revisited, the things that made it work
+were: one renderer taking the two Sets, the totals, a formatter and an `onChange`, so no tab owns a copy; each
+trend tab's `st.groups` starting **empty** (meaning everything) rather than as every group, since the old shape
+cannot express "all of NAOH plus one spec of HCL"; each tab showing the figure beside an entry in **its own
+measure**, not revenue; and a `selectedGroups()` helper deciding which lines exist, in fixed palette order.
+
+- **The selection is two sets, not one.** `state.grp` holds groups ticked WHOLE; `state.item` holds individual
+  item codes ticked inside a group that is not. `inProduct(grp, item)` is the single predicate: both empty
+  means no filter, otherwise the row passes if **either** its group or its item is ticked. That OR is what
+  makes a parent tick mean "all of these" and a child tick mean "just this one". `compute()` and
+  `optionTotals` both go through it — never test `state.grp` directly again.
 - **Ticking a parent clears any part-selection under it**, and unticking one child of a whole group rewrites
   the selection as "every item except this one" (drop the group, add the siblings). Those two rules are what
   keep the parent checkbox honest: checked when the group is whole, **indeterminate** when only some items are,
@@ -265,103 +259,13 @@ not revenue.
 - **`productTotals()` exists because `optionTotals` cannot serve a tree**: it keys both levels at once, and
   keys items by group *and* code so an item appearing under two groups stays two leaves rather than one
   double-counted row. Like every other picker, it excludes the filter being drawn from its own totals.
-- Asserted in the harness, for the margin tab against `compute()` and for all three trend tabs against the
-  real `createTrend().data()`: the tree covers exactly the (group, item) pairs the data holds and invents
-  none; ticking every item of a group is identical to ticking the group on all three measures; item totals add
-  back to their group; the two levels OR correctly and keep the fixed group order; every grain still totals
-  the same under a narrowed selection; one tab's product selection does not touch another's; and an item
-  belonging only to the other company matches nothing when scoped.
-
-`optionTotals(dim)` computes the revenue shown beside each option under **every filter except the one
-being drawn** — `dim` is the row index (0 customer, 1 group, 3 salesperson). A picker included in its
-own totals would show zero against every unticked option, which is the opposite of the number a person
-opening that list wants. `fillOpts` mutates the Set it is handed rather than replacing it, so
-**never reassign `state.picked` / `state.sp` / `state.grp`** — Select all must add in a loop, or every
-checkbox listener is orphaned against a dead Set.
-
-**Each tab explains only its own figures.** There are three `<footer>` elements: one inside each panel
-carrying that tab's "how this is calculated" definitions and notes, and a third, `#notes-footer`, outside
-both for the tonnage-conversion flag — that one is a caveat about MT itself, so it belongs to both tabs.
-It starts `hidden` and `renderMtNotes` un-hides it along with `#mt-notes`; un-hide only the inner div and
-an empty card is drawn under every tab. **A measure added to one tab must be described in that tab's
-footer and no other** — the single shared footer used to tell trend-tab readers about sorting columns and
-two bar charts that are not on their screen.
-
-**The trend tabs are one implementation, instantiated per measure.** `createTrend(cfg)` builds a tab
-from a config naming its id prefix (`cfg.p`), which column of a row it reads (`cfg.value`) and how a
-figure is written (`cfg.full`, `cfg.tick`, `cfg.axis`, `cfg.noun`, `cfg.totalCol`). `TRENDS` holds the
-instances — `mt` reads `r[4] / 1000`, `rev` reads `r[5]`. Everything else is shared: the grain
-machinery, the plot, the crosshair, the legend, the table twin, the slicers, the grain-comparison
-footer.
-
-Each instance carries date range, grain, the product tree (`groups` + `item` + `gpOpen`) **and customers** in its own `st`. The customer
-picker is the searchable panel, not chips — 98 customers is far past what a chip row can hold — and it
-registers itself into the one `PANELS` registry via the `panel` descriptor the factory returns, so a
-click outside any dropdown on any tab behaves identically. Its option list shows each customer's figure
-under the tab's *other* filters but not its own, for the same reason the margin tab's pickers do.
-
-**A third measure is a `TRENDS` entry plus a markup panel — never a copy of the block.** The panels are
-duplicated in the template because their ids must differ, but they are generated from one string in the
-build script for the same reason. Each instance owns its own `st` (date range, grain, groups), so the
-tabs do not disturb one another; that independence is asserted.
-
-**Shortcut Dimension 3 is shown as "Sector" and is EMPTY in BC.** Not the field name, not the query —
-the dimension itself is unset on every value entry: `Dimension_Set_ID` is `0` there, and Global
-Dimension 1 and 2 and Shortcut Dimensions 3–8 all come back `''`. Probed directly against the endpoint.
-The plumbing is in place through the grain and the payload, and the Revenue tab's Sector dropdown hides
-itself below two options, so it will appear on its own the day the dimension is populated. **Do not
-"fix" it page-side.** If it must work sooner, the fix is in Business Central.
-
-**Extra per-measure dimensions are declared, not hand-built.** `cfg.dims` takes
-`{key, idx, label, icon, all, options, name}` and the factory gives each one a Set on `st`, a dropdown,
-a registry entry, a pill and a line in reset. Revenue declares salesperson (`idx: 3`) and sector
-(`idx: 4`); the other tabs declare none. A dimension never filters its own option list.
-
-`cfg.value` is the only place a measure's column appears. Row shape is
-`[customer, group, date, salesperson, sector, item, company, kg, revenue, cost]`, tonnage in **kilograms**,
-revenue already display-positive. Gross profit is **derived, not stored** — `r[8] - r[9]` — and reconciles to
-revenue minus cost of sales, which is asserted.
-
-**All three trend panels are generated from one string** in the build script. They were diverging by
-copy-paste before the third arrived. A change to the slicer band must land on every tab, so edit the
-template, not a panel.
-
-**Coarser grain does not steady every measure.** It does for tonnage and revenue, which is why month is
-the default. Gross profit nets gains against losses inside a bucket, so monthly currently reads spikier
-than weekly. The claim that survives all three, and the one the default rests on, is that **daily is the
-spikiest** — that is what the harness asserts; the order-of-magnitude claim is asserted only where it
-holds.
-
-**Both measures go negative.** A credit memo subtracts, so tonnage and revenue each dip below zero —
-tonnage on a return day, revenue where PROJECT posted about −S$26k in one month. The y scale opens
-downwards for both; do not clamp either.
-
-**The filter band is one 12-column grid.** Every field spans a whole number of columns and the two
-rows each total exactly twelve — `date 3 + quick 4 + grain 3 + view 2`, then
-`customer 3 + groups 7 + reset 2`. **Keep them summing to 12**, or the band goes ragged. Labels sit on
-one line and controls on the line below, which is what makes it read as aligned; every `.ctl` carries
-`min-height: 34px` so the rows stay level whatever they hold.
-
-Chip rows are grids of their own: `.presets.even` gives equal-width columns (quick range, grain, view)
-and `.presets.fill` an `auto-fit` track (product groups), so a chip row **reaches the edge of its cell**
-instead of trailing off. That trailing edge was what made an earlier version look unaligned. An attempt
-at three bordered `.sgroup` sections was worse — blocks of differing height with labels floating at
-whatever height their control happened to be — and was removed.
-
-**Icons come from one `<svg class="sprite">` of `<symbol>`s at the top of the wrap**, referenced by
-`<use href="#ic-…">` in markup and by `icon12()` from script. Build them through `createElementNS`, not
-`innerHTML`: an HTML-parsed `<use>` is an inert element that renders nothing. Marks take colour from
-CSS via `currentColor` — the same rule that keeps `var()` out of `fill`/`stroke`.
-
-**Colour on this band means state, never decoration.** An `.active` pill lights up only when its
-dimension is *narrowing* the view, and Reset gains `.armed` only when there is something to reset —
-grain excluded, since a grain is a way of looking rather than a filter. Whole-range, all-groups and
-no-customer are defaults and stay unlit, so anything highlighted is a deliberate restriction. `sync()`
-redraws the strip; add a filter and it needs a pill, or the strip starts lying.
-
-**The seven series hues are deliberately not used here.** Colour follows the product group everywhere
-on this page; borrowing those hues for chrome would break that reading. Chrome uses accent, ink and the
-warning tone only.
+- **The disclosure toggles `.kids.hidden` in place** rather than re-rendering: opening a group changes no
+  figure, so a rebuild would only throw away focus and scroll position. The checkboxes carry a `data-pkey` so
+  focus is restored across the rebuilds that do happen.
+- Asserted in the harness: the tree covers exactly the (group, item) pairs the data holds and invents none;
+  ticking every item of a group is identical to ticking the group on all three measures; item revenues add
+  back to their group; the two levels OR correctly; and an item belonging only to the other company matches
+  nothing when scoped.
 
 **The trend tabs.** A line chart over time, one line per product group, with its own date range, grain
 and group selection in `st` — deliberately independent of the margin tab's filters, since they answer
@@ -511,7 +415,20 @@ words. If the decision is ever reversed, the elimination and that note move toge
 **The page opens on `defaultFrom`, not `minDate`.** CIL has three years CIM does not exist for, and a combined
 view starting there reads as CIM collapsing rather than as CIM being absent. Earlier dates stay reachable —
 "All time" and the date inputs still go back to `minDate` — and return CIL only. Reset returns to `defaultFrom`,
-and the trend tabs' "whole range" pill compares against it, not against `minDate`.
+and the trend tabs' "whole range" pill compares against it, not against `minDate`. All four bands share one
+`PRESETS` list.
+
+**Opening the margin tab on the current month was tried and rolled back by request** (8 Sep 2026), along with
+the `mtd` quick-range chip that went with it. If it is revisited: derive the month from `DATA.maxDate`, never
+from the clock or a literal, and give it a chip — a default range with no chip lit opens the strip showing
+nothing selected. Do not extend it to the trend tabs: one month at a monthly grain is a single point.
+
+**A restored `<select>` can disagree with `coCode`.** A browser restores form-control values across a soft
+reload, and it does so *after* this script appends the options — so the company control can come back showing
+one company while the page reads another's figures, and re-picking the company already displayed fires no
+`change` event at all. An `autocomplete="off"` fix plus a re-read of `sel.value` on load was written and
+**rolled back by request** (8 Sep 2026) as part of returning to the 15:17 build. If the symptom "changing
+company does not change the data" comes back, this is the first thing to check.
 
 **The notes footer has two independent children** — `#group-note` and `#mt-notes` — so `syncNotesFooter()`
 un-hides the card when *either* has something to say. Un-hiding it from one renderer draws an empty panel under
