@@ -4,3 +4,4 @@ refresh.log
 .mcp.json
 BC-Sales-Margin-Refresh.task.xml
 __pycache__/
+serve.out.log

@@ -92,15 +92,15 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
-.wrap { max-width: 1360px; margin: 0 auto; padding: 0 24px 72px; }
+.wrap { max-width: 1620px; margin: 0 auto; padding: 0 20px 72px; }
 
 /* ---------- shell: identity on the left, data on the right ---------- */
 /* The left column carries what the page IS -- title, company, which view, how fresh --
    and the right carries what it SHOWS. The filter bands stay on the right, beside the
    figures they narrow, because a filter belongs to a view rather than to the product. */
 .shell {
-  display: grid; grid-template-columns: 264px minmax(0, 1fr);
-  gap: 24px; align-items: start; padding-top: 24px;
+  display: grid; grid-template-columns: 248px minmax(0, 1fr);
+  gap: 20px; align-items: start; padding-top: 24px;
 }
 /* minmax(0, 1fr), not 1fr: a grid column defaults to min-content width, and the monthly
    grid is far wider than its viewport. Without this the table pushes the column open and
@@ -233,14 +233,20 @@ select.co-select.group { border-color: var(--accent); color: var(--accent); }
 
    The head is the card's only child, so its divider would be a rule with nothing under
    it. */
-.page-card { margin-bottom: 22px; }
-.page-card .card-head { border-bottom: 0; padding-bottom: 16px; }
+.page-card { margin-bottom: 12px; }
+/* The eyebrow is gone from these four heads: "Margin" and "Trend" only repeated what the
+   selected tab in the side panel already says, and the heading carries the identity on its
+   own once it is a little larger. Losing a line lets the head sit tighter too, which is
+   what keeps the title card from towering over the band and the figures below it. */
+.page-card .card-head { border-bottom: 0; padding: 12px 20px 12px; }
+.page-card .card-head h2 { margin: 0; font-size: 19px; }
+.page-card .card-head .hint { margin-top: 4px; }
 
 /* ---------- filter bar ---------- */
 .filters {
   position: sticky; top: 0; z-index: 40;
   display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px 20px;
-  padding: 14px 18px; margin-bottom: 22px;
+  padding: 14px 18px; margin-bottom: 12px;
   background: var(--surface); border: 1px solid var(--hairline);
   border-radius: 10px; box-shadow: var(--shadow);
 }
@@ -413,7 +419,7 @@ button.twist[aria-expanded="true"] span { transform: rotate(90deg); }
 .slicers {
   position: sticky; top: 0; z-index: 40;
   display: grid; grid-template-columns: repeat(12, minmax(0, 1fr));
-  gap: 13px 16px; padding: 14px 18px; margin-bottom: 22px;
+  gap: 13px 16px; padding: 14px 18px; margin-bottom: 12px;
   background: var(--surface); border: 1px solid var(--hairline);
   border-radius: 10px; box-shadow: var(--shadow);
 }
@@ -813,7 +819,6 @@ footer .flag[role="note"] i { color: var(--ink); font-style: normal; font-weight
   <section class="card page-card">
     <div class="card-head">
       <div class="ph-text">
-        <p class="eyebrow">Margin</p>
         <h2>Sales margin</h2>
         <p class="hint">Volume, revenue, cost of sales and gross profit by customer, month by month.</p>
       </div>
@@ -989,7 +994,6 @@ footer .flag[role="note"] i { color: var(--ink); font-style: normal; font-weight
     <section class="card page-card">
       <div class="card-head">
         <div class="ph-text">
-          <p class="eyebrow">Trend</p>
           <h2>MT trend</h2>
           <p class="hint" id="tr-hint"></p>
         </div>
@@ -1153,7 +1157,6 @@ footer .flag[role="note"] i { color: var(--ink); font-style: normal; font-weight
     <section class="card page-card">
       <div class="card-head">
         <div class="ph-text">
-          <p class="eyebrow">Trend</p>
           <h2>Revenue trend</h2>
           <p class="hint" id="rv-hint"></p>
         </div>
@@ -1353,7 +1356,6 @@ footer .flag[role="note"] i { color: var(--ink); font-style: normal; font-weight
     <section class="card page-card">
       <div class="card-head">
         <div class="ph-text">
-          <p class="eyebrow">Trend</p>
           <h2>Gross profit trend</h2>
           <p class="hint" id="gp-hint"></p>
         </div>
